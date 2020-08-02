@@ -1,10 +1,14 @@
 package com.softwareverde.guvnor;
 
-import com.softwareverde.constable.list.mutable.MutableList;
+import com.softwareverde.http.server.HttpServer;
+import com.softwareverde.http.server.endpoint.Endpoint;
+import com.softwareverde.http.server.servlet.Servlet;
+import com.softwareverde.http.server.servlet.request.Request;
+import com.softwareverde.http.server.servlet.response.Response;
+import com.softwareverde.json.Json;
 import com.softwareverde.logging.LogLevel;
 import com.softwareverde.logging.Logger;
-import com.softwareverde.socket.SocketConnection;
-import com.softwareverde.socket.server.SocketServer;
+import com.softwareverde.util.StringUtil;
 
 public class Main {
     protected static Main INSTANCE = null;
@@ -13,8 +17,7 @@ public class Main {
         public static final Integer RPC_PORT = 8332;
     }
 
-    protected final SocketServer _socketServer;
-    protected final MutableList<SocketConnection> _connections = new MutableList<SocketConnection>();
+    protected final HttpServer _httpServer;
 
     public static void main(final String[] arguments) {
         if (Main.INSTANCE == null) {
@@ -26,37 +29,32 @@ public class Main {
     protected Main(final String[] arguments) {
         Logger.setLogLevel(LogLevel.ON);
 
-        _socketServer = new SocketServer(Defaults.RPC_PORT);
-        _socketServer.setSocketEventCallback(new SocketServer.SocketEventCallback() {
+        final Endpoint endpoint = new Endpoint(new Servlet() {
             @Override
-            public void onConnect(final SocketConnection socketConnection) {
-                synchronized (_connections) {
-                    socketConnection.setMessageReceivedCallback(new Runnable() {
-                        @Override
-                        public void run() {
-                            final String message = socketConnection.popMessage();
-                            Logger.trace(message);
-                        }
-                    });
+            public Response onRequest(final Request request) {
+                final String postData = StringUtil.bytesToString(request.getRawPostData());
+                final Json json = Json.parse(postData);
 
-                    _connections.add(socketConnection);
-                    Logger.trace("New connection: " + socketConnection);
-                }
-            }
+                Logger.trace(json.toFormattedString(2));
 
-            @Override
-            public void onDisconnect(final SocketConnection socketConnection) {
-                synchronized (_connections) {
-                    final int index = _connections.indexOf(socketConnection);
-                    _connections.remove(index);
-                    Logger.trace("Connection lost: " + socketConnection);
-                }
+                final Response response = new Response();
+                response.setCode(Response.Codes.BAD_REQUEST);
+                response.setContent(new byte[0]);
+                return response;
             }
         });
+        endpoint.setPath("/");
+        endpoint.setStrictPathEnabled(true);
+
+        _httpServer = new HttpServer();
+        _httpServer.setPort(Defaults.RPC_PORT);
+        _httpServer.enableEncryption(false);
+        _httpServer.redirectToTls(false);
+        _httpServer.addEndpoint(endpoint);
     }
 
     public void run() {
-        _socketServer.start();
+        _httpServer.start();
         Logger.debug("Server started.");
 
         while (! Thread.interrupted()) {
@@ -68,6 +66,7 @@ public class Main {
             }
         }
 
+        _httpServer.stop();
         Logger.debug("Server stopped.");
     }
 }
