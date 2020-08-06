@@ -1,7 +1,7 @@
 package com.softwareverde.guvnor.proxy;
 
-import com.softwareverde.guvnor.BitcoinNodeAddress;
+import com.softwareverde.guvnor.proxy.rpc.RpcConfiguration;
 
 public interface NodeSelector {
-    BitcoinNodeAddress selectBestNode();
+    RpcConfiguration selectBestNode();
 }

@@ -2,25 +2,25 @@ package com.softwareverde.guvnor.proxy;
 
 import com.softwareverde.constable.list.List;
 import com.softwareverde.constable.list.mutable.MutableList;
-import com.softwareverde.guvnor.BitcoinNodeAddress;
+import com.softwareverde.guvnor.proxy.rpc.RpcConfiguration;
 import com.softwareverde.http.server.HttpServer;
 import com.softwareverde.http.server.endpoint.Endpoint;
 
 public class RpcProxyServer {
     protected final Integer _port;
     protected final HttpServer _httpServer;
-    protected final MutableList<BitcoinNodeAddress> _bitcoinNodeAddresses = new MutableList<BitcoinNodeAddress>();
+    protected final MutableList<RpcConfiguration> _rpcConfigurations = new MutableList<RpcConfiguration>();
 
-    public RpcProxyServer(final Integer port, final List<BitcoinNodeAddress> bitcoinNodeAddresses) {
+    public RpcProxyServer(final Integer port, final List<RpcConfiguration> rpcConfigurations) {
         _port = port;
-        _bitcoinNodeAddresses.addAll(bitcoinNodeAddresses);
+        _rpcConfigurations.addAll(rpcConfigurations);
 
         final Endpoint endpoint;
         {
             final NodeSelector nodeSelector = new NodeSelector() {
                 @Override
-                public BitcoinNodeAddress selectBestNode() {
-                    return _bitcoinNodeAddresses.get(0); // TODO: Select node based on configuration and ChainWork...
+                public RpcConfiguration selectBestNode() {
+                    return _rpcConfigurations.get(0); // TODO: Select node based on configuration and ChainWork...
                 }
             };
 

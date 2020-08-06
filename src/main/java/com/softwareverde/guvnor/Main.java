@@ -2,6 +2,9 @@ package com.softwareverde.guvnor;
 
 import com.softwareverde.constable.list.immutable.ImmutableList;
 import com.softwareverde.guvnor.proxy.RpcProxyServer;
+import com.softwareverde.guvnor.proxy.rpc.RpcConfiguration;
+import com.softwareverde.guvnor.proxy.rpc.connector.BitcoinCoreConnector;
+import com.softwareverde.guvnor.proxy.rpc.connector.BitcoinRpcConnector;
 import com.softwareverde.logging.LogLevel;
 import com.softwareverde.logging.Logger;
 
@@ -24,11 +27,25 @@ public class Main {
     protected Main(final String[] arguments) {
         Logger.setLogLevel(LogLevel.ON);
 
-        final ImmutableList<BitcoinNodeAddress> bitcoinNodeAddresses;
+        final RpcConfiguration bchdConfiguration;
+        {
+            final BitcoinNodeAddress bchdAddress = new BitcoinNodeAddress("bchd.greyh.at", 8334, true);
+            final BitcoinRpcConnector bchdConnector = new BitcoinCoreConnector(bchdAddress);
+            bchdConfiguration = new RpcConfiguration(bchdAddress, bchdConnector);
+        }
+
+        final RpcConfiguration bchnConfiguration;
+        {
+            final BitcoinNodeAddress bchnAddress = new BitcoinNodeAddress("btc.sv.net", 8332);
+            final BitcoinRpcConnector bchdConnector = new BitcoinCoreConnector(bchnAddress);
+            bchnConfiguration = new RpcConfiguration(bchnAddress, bchdConnector);
+        }
+
+        final ImmutableList<RpcConfiguration> rpcConfigurations;
         { // TODO: Read from arguments...
-            bitcoinNodeAddresses = new ImmutableList<BitcoinNodeAddress>(
-                new BitcoinNodeAddress("bchd.greyh.at", 8335),
-                new BitcoinNodeAddress("btc.sv.net", 8332)
+            rpcConfigurations = new ImmutableList<RpcConfiguration>(
+                bchdConfiguration,
+                bchnConfiguration
             );
         }
 
@@ -37,7 +54,7 @@ public class Main {
             rpcPort = Defaults.RPC_PORT;
         }
 
-        _rpcProxyServer = new RpcProxyServer(rpcPort, bitcoinNodeAddresses);
+        _rpcProxyServer = new RpcProxyServer(rpcPort, rpcConfigurations);
     }
 
     public void run() {
