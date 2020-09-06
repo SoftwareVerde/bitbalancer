@@ -27,22 +27,22 @@ public class Main {
     protected Main(final String[] arguments) {
         Logger.setLogLevel(LogLevel.ON);
 
-        final RpcConfiguration bchdConfiguration;
-        {
-            final BitcoinNodeAddress bchdAddress = new BitcoinNodeAddress("bchd.greyh.at", 8334, true);
-            final BitcoinRpcConnector bchdConnector = new BitcoinCoreConnector(bchdAddress);
-            bchdConfiguration = new RpcConfiguration(bchdAddress, bchdConnector);
-        }
-
-        final RpcConfiguration bchnConfiguration;
-        {
-            final BitcoinNodeAddress bchnAddress = new BitcoinNodeAddress("btc.sv.net", 8332);
-            final BitcoinRpcConnector bchdConnector = new BitcoinCoreConnector(bchnAddress);
-            bchnConfiguration = new RpcConfiguration(bchnAddress, bchdConnector);
-        }
-
         final ImmutableList<RpcConfiguration> rpcConfigurations;
         { // TODO: Read from arguments...
+            final RpcConfiguration bchdConfiguration;
+            {
+                final BitcoinNodeAddress bchdAddress = new BitcoinNodeAddress("bchd.greyh.at", 8334, true);
+                final BitcoinRpcConnector bchdConnector = new BitcoinCoreConnector(bchdAddress);
+                bchdConfiguration = new RpcConfiguration(bchdAddress, bchdConnector, 0);
+            }
+
+            final RpcConfiguration bchnConfiguration;
+            {
+                final BitcoinNodeAddress bchnAddress = new BitcoinNodeAddress("btc.sv.net", 8332);
+                final BitcoinRpcConnector bchdConnector = new BitcoinCoreConnector(bchnAddress);
+                bchnConfiguration = new RpcConfiguration(bchnAddress, bchdConnector, 1);
+            }
+
             rpcConfigurations = new ImmutableList<RpcConfiguration>(
                 bchdConfiguration,
                 bchnConfiguration

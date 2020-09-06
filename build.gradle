@@ -21,6 +21,7 @@ dependencies {
     implementation  group: 'com.github.softwareverde',  name: 'http-servlet',           version: 'v3.2.0'
     implementation (group: 'com.github.softwareverde',  name: 'java-http-client',       version: 'v2.0.5', force: true)
     implementation  group: 'com.github.softwareverde',  name: 'java-cryptography',      version: 'v3.0.0'
+    implementation  group: 'com.github.softwareverde',  name: 'bitcoin-verde',          version: 'e08e2b90'
 
     testImplementation 'junit:junit:4.12'
 }
