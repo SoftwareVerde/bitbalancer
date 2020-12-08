@@ -3,6 +3,7 @@ package com.softwareverde.guvnor;
 import com.softwareverde.constable.list.immutable.ImmutableList;
 import com.softwareverde.guvnor.proxy.RpcProxyServer;
 import com.softwareverde.guvnor.proxy.rpc.RpcConfiguration;
+import com.softwareverde.guvnor.proxy.rpc.RpcCredentials;
 import com.softwareverde.guvnor.proxy.rpc.connector.BitcoinCoreConnector;
 import com.softwareverde.guvnor.proxy.rpc.connector.BitcoinRpcConnector;
 import com.softwareverde.logging.LogLevel;
@@ -32,15 +33,23 @@ public class Main {
             final RpcConfiguration bchdConfiguration;
             {
                 final BitcoinNodeAddress bchdAddress = new BitcoinNodeAddress("bchd.greyh.at", 8334, true);
-                final BitcoinRpcConnector bchdConnector = new BitcoinCoreConnector(bchdAddress);
-                bchdConfiguration = new RpcConfiguration(bchdAddress, bchdConnector, 0);
+                final RpcCredentials bchdRpcCredentials = new RpcCredentials(
+                    "",
+                    ""
+                );
+                final BitcoinRpcConnector bchdConnector = new BitcoinCoreConnector(bchdAddress, bchdRpcCredentials);
+                bchdConfiguration = new RpcConfiguration(bchdConnector, 0);
             }
 
             final RpcConfiguration bchnConfiguration;
             {
                 final BitcoinNodeAddress bchnAddress = new BitcoinNodeAddress("btc.sv.net", 8332);
-                final BitcoinRpcConnector bchdConnector = new BitcoinCoreConnector(bchnAddress);
-                bchnConfiguration = new RpcConfiguration(bchnAddress, bchdConnector, 1);
+                final RpcCredentials bchnRpcCredentials = new RpcCredentials(
+                    "",
+                    ""
+                );
+                final BitcoinRpcConnector bchnConnector = new BitcoinCoreConnector(bchnAddress, bchnRpcCredentials);
+                bchnConfiguration = new RpcConfiguration(bchnConnector, 1);
             }
 
             rpcConfigurations = new ImmutableList<RpcConfiguration>(

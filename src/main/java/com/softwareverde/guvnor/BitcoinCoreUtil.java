@@ -2,9 +2,9 @@ package com.softwareverde.guvnor;
 
 import com.softwareverde.http.server.servlet.response.Response;
 
-public class AbcUtil {
+public class BitcoinCoreUtil {
     /**
-     * Returns the appropriate verbatim error message that Bitcoin-ABC responds with for an RPC response code.
+     * Returns the appropriate verbatim error message that Bitcoin Core / BCHN responds with for an RPC response code.
      * Logic transpiled from: https://github.com/bitcoin-abc/bitcoin-abc/blob/master/src/bitcoin-cli.cpp
      */
     public static String getErrorMessage(final Integer responseCode) {

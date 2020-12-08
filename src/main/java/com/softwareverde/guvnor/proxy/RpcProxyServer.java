@@ -25,7 +25,11 @@ public class RpcProxyServer {
             final NodeSelector nodeSelector = new NodeSelector() {
                 @Override
                 public RpcConfiguration selectBestNode() {
-                    return _rpcConfigurations.get(0); // TODO: Select node based on configuration and ChainWork...
+                    // TODO: Select node based on configuration and ChainWork...
+                    for (final RpcConfiguration rpcConfiguration : _rpcConfigurations.values()) {
+                        return rpcConfiguration;
+                    }
+                    return null;
                 }
             };
 
