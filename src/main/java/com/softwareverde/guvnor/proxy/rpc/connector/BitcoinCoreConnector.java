@@ -24,6 +24,16 @@ public class BitcoinCoreConnector implements BitcoinRpcConnector {
     }
 
     @Override
+    public String getHost() {
+        return _bitcoinNodeAddress.getHost();
+    }
+
+    @Override
+    public Integer getPort() {
+        return _bitcoinNodeAddress.getPort();
+    }
+
+    @Override
     public Response handleRequest(final Request request) {
         final MutableByteArray rawPostData = MutableByteArray.wrap(request.getRawPostData());
 

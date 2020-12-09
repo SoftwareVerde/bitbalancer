@@ -16,6 +16,13 @@ public class RpcProxyHandler implements Servlet {
     @Override
     public Response onRequest(final Request request) {
         final RpcConfiguration rpcConfiguration = _nodeSelector.selectBestNode();
+        if (rpcConfiguration == null) {
+            final Response errorResponse = new Response();
+            errorResponse.setCode(Response.Codes.SERVER_ERROR);
+            errorResponse.setContent("No viable node connection found.");
+            return errorResponse;
+        }
+
         final BitcoinRpcConnector bitcoinRpcConnector = rpcConfiguration.getBitcoinRpcConnector();
         return bitcoinRpcConnector.handleRequest(request);
     }

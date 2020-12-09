@@ -51,10 +51,10 @@ public class Main {
             for (final NodeProperties nodeProperties : configuration.getNodeProperties()) {
                 final String host = nodeProperties.getHost();
                 final Integer port = nodeProperties.getPort();
-                final BitcoinNodeAddress bchdAddress = new BitcoinNodeAddress(host, port, nodeProperties.isSecure());
-                final RpcCredentials bchdRpcCredentials = new RpcCredentials(nodeProperties.getRpcUsername(), nodeProperties.getRpcPassword());
-                final BitcoinRpcConnector bchdConnector = new BitcoinCoreConnector(bchdAddress, bchdRpcCredentials);
-                final RpcConfiguration rpcConfiguration = new RpcConfiguration(bchdConnector, preferenceOrder);
+                final BitcoinNodeAddress bitcoinNodeAddress = new BitcoinNodeAddress(host, port, nodeProperties.isSecure());
+                final RpcCredentials rpcCredentials = new RpcCredentials(nodeProperties.getRpcUsername(), nodeProperties.getRpcPassword());
+                final BitcoinRpcConnector bitcoinRpcConnector = new BitcoinCoreConnector(bitcoinNodeAddress, rpcCredentials);
+                final RpcConfiguration rpcConfiguration = new RpcConfiguration(bitcoinRpcConnector, preferenceOrder);
 
                 rpcConfigurations.add(rpcConfiguration);
                 Logger.info("Added endpoint: " + preferenceOrder + "=" + host + ":" + port);
