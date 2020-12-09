@@ -1,0 +1,12 @@
+{
+  "port": 8332,
+  "nodes": [
+    {
+      "host": "",
+      "port": 8332,
+      "isSecure": false,
+      "rpcUsername": "",
+      "rpcPassword": ""
+    }
+  ]
+}

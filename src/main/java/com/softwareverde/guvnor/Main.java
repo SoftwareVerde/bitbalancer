@@ -1,6 +1,9 @@
 package com.softwareverde.guvnor;
 
-import com.softwareverde.constable.list.immutable.ImmutableList;
+import com.softwareverde.constable.list.mutable.MutableList;
+import com.softwareverde.guvnor.configuration.Configuration;
+import com.softwareverde.guvnor.configuration.ConfigurationParser;
+import com.softwareverde.guvnor.configuration.NodeProperties;
 import com.softwareverde.guvnor.proxy.RpcProxyServer;
 import com.softwareverde.guvnor.proxy.rpc.RpcConfiguration;
 import com.softwareverde.guvnor.proxy.rpc.RpcCredentials;
@@ -28,39 +31,36 @@ public class Main {
     protected Main(final String[] arguments) {
         Logger.setLogLevel(LogLevel.ON);
 
-        final ImmutableList<RpcConfiguration> rpcConfigurations;
-        { // TODO: Read from arguments...
-            final RpcConfiguration bchdConfiguration;
-            {
-                final BitcoinNodeAddress bchdAddress = new BitcoinNodeAddress("bchd.greyh.at", 8334, true);
-                final RpcCredentials bchdRpcCredentials = new RpcCredentials(
-                    "",
-                    ""
-                );
-                final BitcoinRpcConnector bchdConnector = new BitcoinCoreConnector(bchdAddress, bchdRpcCredentials);
-                bchdConfiguration = new RpcConfiguration(bchdConnector, 0);
-            }
-
-            final RpcConfiguration bchnConfiguration;
-            {
-                final BitcoinNodeAddress bchnAddress = new BitcoinNodeAddress("btc.sv.net", 8332);
-                final RpcCredentials bchnRpcCredentials = new RpcCredentials(
-                    "",
-                    ""
-                );
-                final BitcoinRpcConnector bchnConnector = new BitcoinCoreConnector(bchnAddress, bchnRpcCredentials);
-                bchnConfiguration = new RpcConfiguration(bchnConnector, 1);
-            }
-
-            rpcConfigurations = new ImmutableList<RpcConfiguration>(
-                bchdConfiguration,
-                bchnConfiguration
-            );
+        if (arguments.length != 1) {
+            System.err.println("Missing Argument: <configuration>");
+            System.exit(1);
         }
 
-        final Integer rpcPort;
-        { // TODO: Read from arguments...
-            rpcPort = Defaults.RPC_PORT;
+        final String configurationFilename = arguments[0];
+        final ConfigurationParser configurationParser = new ConfigurationParser();
+        final Configuration configuration = configurationParser.parseConfigurationFile(configurationFilename);
+        if (configuration == null) {
+            System.err.println("Error parsing configuration: " + configurationFilename);
+            System.exit(1);
+        }
+
+        final Integer rpcPort = configuration.getRpcPort();
+        final MutableList<RpcConfiguration> rpcConfigurations = new MutableList<>();
+        {
+            int preferenceOrder = 0;
+            for (final NodeProperties nodeProperties : configuration.getNodeProperties()) {
+                final String host = nodeProperties.getHost();
+                final Integer port = nodeProperties.getPort();
+                final BitcoinNodeAddress bchdAddress = new BitcoinNodeAddress(host, port, nodeProperties.isSecure());
+                final RpcCredentials bchdRpcCredentials = new RpcCredentials(nodeProperties.getRpcUsername(), nodeProperties.getRpcPassword());
+                final BitcoinRpcConnector bchdConnector = new BitcoinCoreConnector(bchdAddress, bchdRpcCredentials);
+                final RpcConfiguration rpcConfiguration = new RpcConfiguration(bchdConnector, preferenceOrder);
+
+                rpcConfigurations.add(rpcConfiguration);
+                Logger.info("Added endpoint: " + preferenceOrder + "=" + host + ":" + port);
+
+                preferenceOrder += 1;
+            }
         }
 
         _rpcProxyServer = new RpcProxyServer(rpcPort, rpcConfigurations);
@@ -68,7 +68,7 @@ public class Main {
 
     public void run() {
         _rpcProxyServer.start();
-        Logger.debug("Server started.");
+        Logger.info("Server started, listening on port " + _rpcProxyServer.getPort() + ".");
 
         while (! Thread.interrupted()) {
             try {

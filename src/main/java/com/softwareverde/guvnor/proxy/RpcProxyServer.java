@@ -54,4 +54,8 @@ public class RpcProxyServer {
     public void stop() {
         _httpServer.stop();
     }
+
+    public Integer getPort() {
+        return _port;
+    }
 }
