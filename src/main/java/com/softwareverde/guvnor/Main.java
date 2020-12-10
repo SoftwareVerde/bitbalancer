@@ -7,7 +7,7 @@ import com.softwareverde.guvnor.configuration.NodeProperties;
 import com.softwareverde.guvnor.proxy.RpcProxyServer;
 import com.softwareverde.guvnor.proxy.rpc.RpcConfiguration;
 import com.softwareverde.guvnor.proxy.rpc.RpcCredentials;
-import com.softwareverde.guvnor.proxy.rpc.connector.BitcoinCoreConnector;
+import com.softwareverde.guvnor.proxy.rpc.connector.BitcoinCoreRpcConnector;
 import com.softwareverde.guvnor.proxy.rpc.connector.BitcoinRpcConnector;
 import com.softwareverde.logging.LogLevel;
 import com.softwareverde.logging.Logger;
@@ -53,7 +53,7 @@ public class Main {
                 final Integer port = nodeProperties.getPort();
                 final BitcoinNodeAddress bitcoinNodeAddress = new BitcoinNodeAddress(host, port, nodeProperties.isSecure());
                 final RpcCredentials rpcCredentials = new RpcCredentials(nodeProperties.getRpcUsername(), nodeProperties.getRpcPassword());
-                final BitcoinRpcConnector bitcoinRpcConnector = new BitcoinCoreConnector(bitcoinNodeAddress, rpcCredentials);
+                final BitcoinRpcConnector bitcoinRpcConnector = new BitcoinCoreRpcConnector(bitcoinNodeAddress, rpcCredentials);
                 final RpcConfiguration rpcConfiguration = new RpcConfiguration(bitcoinRpcConnector, preferenceOrder);
 
                 rpcConfigurations.add(rpcConfiguration);

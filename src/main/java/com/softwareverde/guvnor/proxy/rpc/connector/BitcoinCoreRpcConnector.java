@@ -14,11 +14,11 @@ import com.softwareverde.util.Util;
 
 import java.util.Collection;
 
-public class BitcoinCoreConnector implements BitcoinRpcConnector {
+public class BitcoinCoreRpcConnector implements BitcoinRpcConnector {
     protected final BitcoinNodeAddress _bitcoinNodeAddress;
     protected final RpcCredentials _rpcCredentials;
 
-    public BitcoinCoreConnector(final BitcoinNodeAddress bitcoinNodeAddress, final RpcCredentials rpcCredentials) {
+    public BitcoinCoreRpcConnector(final BitcoinNodeAddress bitcoinNodeAddress, final RpcCredentials rpcCredentials) {
         _bitcoinNodeAddress = bitcoinNodeAddress;
         _rpcCredentials = rpcCredentials;
     }
