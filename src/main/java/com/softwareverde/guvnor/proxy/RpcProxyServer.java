@@ -3,6 +3,7 @@ package com.softwareverde.guvnor.proxy;
 import com.softwareverde.bitcoin.block.header.difficulty.work.ChainWork;
 import com.softwareverde.constable.list.List;
 import com.softwareverde.constable.list.mutable.MutableList;
+import com.softwareverde.cryptography.hash.sha256.Sha256Hash;
 import com.softwareverde.guvnor.proxy.rpc.ChainHeight;
 import com.softwareverde.guvnor.proxy.rpc.RpcConfiguration;
 import com.softwareverde.guvnor.proxy.rpc.connector.BitcoinRpcConnector;
@@ -150,6 +151,10 @@ public class RpcProxyServer {
         return zmqEndpoints;
     }
 
+    protected RpcConfiguration _selectBestRpcConfiguration() {
+        return _selectBestRpcConfiguration(null);
+    }
+
     protected RpcConfiguration _selectBestRpcConfiguration(final NotificationType requiredZmqNotificationType) {
         int bestHierarchy = Integer.MIN_VALUE;
         ChainHeight bestChainHeight = UNKNOWN_CHAIN_HEIGHT;
@@ -192,7 +197,7 @@ public class RpcProxyServer {
         final NotificationType notificationType = notification.notificationType;
         final ZmqNotificationPublisherThread publisherThread = _zmqPublisherThreads.get(notificationType);
         if (publisherThread != null) {
-            Logger.debug("Relaying: " + notification.notificationType + " " + HexUtil.toHexString(notification.payload.getBytes(0, 32)) + " +" + (notification.payload.getByteCount() - 32));
+            Logger.trace("Relaying: " + notification.notificationType + " " + HexUtil.toHexString(notification.payload.getBytes(0, 32)) + " +" + (notification.payload.getByteCount() - 32));
             publisherThread.sendMessage(notification);
         }
     }
@@ -278,12 +283,12 @@ public class RpcProxyServer {
             zmqNotificationPublisherThread.start();
         }
 
-        final Endpoint endpoint;
+        final Endpoint rpcProxyEndpoint;
         {
             final NodeSelector nodeSelector = new NodeSelector() {
                 @Override
                 public RpcConfiguration selectBestNode() {
-                    final RpcConfiguration bestRpcConfiguration = _selectBestRpcConfiguration(null);
+                    final RpcConfiguration bestRpcConfiguration = _selectBestRpcConfiguration();
                     if (bestRpcConfiguration == null) {
                         Logger.debug("No node available.");
                         return null;
@@ -295,18 +300,75 @@ public class RpcProxyServer {
                 }
             };
 
-            endpoint = new Endpoint(
+            rpcProxyEndpoint = new Endpoint(
                 new RpcProxyHandler(nodeSelector)
             );
-            endpoint.setPath("/");
-            endpoint.setStrictPathEnabled(true);
+            rpcProxyEndpoint.setPath("/");
+            rpcProxyEndpoint.setStrictPathEnabled(true);
+        }
+
+        final NotifyEndpoint.Context notifyContext = new NotifyEndpoint.Context() {
+            @Override
+            public RpcConfiguration getBestRpcConfiguration() {
+                return _selectBestRpcConfiguration();
+            }
+
+            @Override
+            public List<RpcConfiguration> getRpcConfigurations() {
+                return new MutableList<RpcConfiguration>(_rpcConfigurations.keySet());
+            }
+
+            @Override
+            public void relayNotification(final Notification notification) {
+                _relayNotification(notification);
+            }
+        };
+
+        final Endpoint blockNotifyEndpoint;
+        {
+            blockNotifyEndpoint = new Endpoint(
+                new NotifyEndpoint(NotificationType.BLOCK, notifyContext)
+            );
+            blockNotifyEndpoint.setPath("/api/v1/publish/block/raw");
+            blockNotifyEndpoint.setStrictPathEnabled(true);
+        }
+
+        final Endpoint blockHashNotifyEndpoint;
+        {
+            blockHashNotifyEndpoint = new Endpoint(
+                new NotifyEndpoint(NotificationType.BLOCK_HASH, notifyContext, Sha256Hash.BYTE_COUNT)
+            );
+            blockHashNotifyEndpoint.setPath("/api/v1/publish/block/hash");
+            blockHashNotifyEndpoint.setStrictPathEnabled(true);
+        }
+
+        final Endpoint transactionNotifyEndpoint;
+        {
+            transactionNotifyEndpoint = new Endpoint(
+                new NotifyEndpoint(NotificationType.TRANSACTION, notifyContext)
+            );
+            transactionNotifyEndpoint.setPath("/api/v1/publish/transaction/raw");
+            transactionNotifyEndpoint.setStrictPathEnabled(true);
+        }
+
+        final Endpoint transactionHashNotifyEndpoint;
+        {
+            transactionHashNotifyEndpoint = new Endpoint(
+                new NotifyEndpoint(NotificationType.TRANSACTION_HASH, notifyContext, Sha256Hash.BYTE_COUNT)
+            );
+            transactionHashNotifyEndpoint.setPath("/api/v1/publish/transaction/hash");
+            transactionHashNotifyEndpoint.setStrictPathEnabled(true);
         }
 
         _httpServer = new HttpServer();
         _httpServer.setPort(_port);
         _httpServer.enableEncryption(false);
         _httpServer.redirectToTls(false);
-        _httpServer.addEndpoint(endpoint);
+        _httpServer.addEndpoint(rpcProxyEndpoint);
+        _httpServer.addEndpoint(blockNotifyEndpoint);
+        _httpServer.addEndpoint(blockHashNotifyEndpoint);
+        _httpServer.addEndpoint(transactionNotifyEndpoint);
+        _httpServer.addEndpoint(transactionHashNotifyEndpoint);
     }
 
     public void start() {
