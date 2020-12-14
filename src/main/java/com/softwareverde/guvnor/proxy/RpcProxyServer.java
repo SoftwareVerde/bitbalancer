@@ -13,6 +13,7 @@ import com.softwareverde.http.server.endpoint.Endpoint;
 import com.softwareverde.http.server.servlet.response.Response;
 import com.softwareverde.json.Json;
 import com.softwareverde.logging.Logger;
+import com.softwareverde.util.HexUtil;
 import com.softwareverde.util.StringUtil;
 import com.softwareverde.util.Util;
 
@@ -29,6 +30,7 @@ public class RpcProxyServer {
     protected final HttpServer _httpServer;
     protected final HashMap<RpcConfiguration, ChainHeight> _rpcConfigurations = new HashMap<>();
 
+    protected final ConcurrentHashMap<NotificationType, ZmqNotificationPublisherThread> _zmqPublisherThreads = new ConcurrentHashMap<>();
     protected final ConcurrentHashMap<RpcConfiguration, List<ZmqNotificationThread>> _zmqNotificationThreads = new ConcurrentHashMap<>();
 
     protected ChainHeight _getChainHeight(final BitcoinRpcConnector bitcoinRpcConnector) {
@@ -73,7 +75,22 @@ public class RpcProxyServer {
         return new ChainHeight(blockHeight, chainWork);
     }
 
-    protected Map<String, String> _getZmqEndpoints(final BitcoinRpcConnector bitcoinRpcConnector) {
+    protected Map<NotificationType, String> _getZmqEndpoints(final RpcConfiguration rpcConfiguration) {
+        final BitcoinRpcConnector bitcoinRpcConnector = rpcConfiguration.getBitcoinRpcConnector();
+        final String baseEndpointUri = ("tcp://" + bitcoinRpcConnector.getHost() + ":");
+
+        if (rpcConfiguration.hasZmqPorts()) {
+            final HashMap<NotificationType, String> zmqEndpoints = new HashMap<>();
+            for (final NotificationType notificationType : NotificationType.values()) {
+                final Integer zmqPort = rpcConfiguration.getZmqPort(notificationType);
+                if (zmqPort == null) { continue; }
+
+                final String endpointUri = (baseEndpointUri + zmqPort);
+                zmqEndpoints.put(notificationType, endpointUri);
+            }
+            return zmqEndpoints;
+        }
+
         final byte[] requestPayload;
         { // Build request payload
             final Json json = new Json(false);
@@ -88,11 +105,13 @@ public class RpcProxyServer {
             requestPayload = StringUtil.stringToBytes(json.toString());
         }
 
+        Logger.trace("Attempting to collect ZMQ configuration for node: " + rpcConfiguration);
+
         final MutableRequest request = new MutableRequest();
         request.setMethod(HttpMethod.POST);
         request.setRawPostData(requestPayload);
 
-        final HashMap<String, String> zmqEndpoints = new HashMap<>();
+        final HashMap<NotificationType, String> zmqEndpoints = new HashMap<>();
         final Json resultJson;
         {
             final Response response = bitcoinRpcConnector.handleRequest(request);
@@ -104,13 +123,15 @@ public class RpcProxyServer {
                 return zmqEndpoints;
             }
 
-            resultJson = responseJson;
+            resultJson = responseJson.get("result");
         }
 
-
         for (int i = 0; i < resultJson.length(); ++i) {
-            final String messageType = resultJson.getString("type");
-            final String address = resultJson.getString("address");
+            final Json configJson = resultJson.get(i);
+            final String messageTypeString = configJson.getString("type");
+            final NotificationType notificationType = ZmqMessageTypeConverter.fromPublishString(messageTypeString);
+            final String address = configJson.getString("address");
+
             final Integer port;
             {
                 final int colonIndex = address.lastIndexOf(':');
@@ -122,14 +143,14 @@ public class RpcProxyServer {
                 port = Util.parseInt(address.substring(portBeginIndex));
             }
 
-            final String endpointUri = ("tcp://" + bitcoinRpcConnector.getHost() + ":" + port);
-            zmqEndpoints.put(messageType, endpointUri);
+            final String endpointUri = (baseEndpointUri + port);
+            zmqEndpoints.put(notificationType, endpointUri);
         }
 
         return zmqEndpoints;
     }
 
-    protected RpcConfiguration _selectBestRpcConfiguration(final String requiredZmqNotificationType) {
+    protected RpcConfiguration _selectBestRpcConfiguration(final NotificationType requiredZmqNotificationType) {
         int bestHierarchy = Integer.MIN_VALUE;
         ChainHeight bestChainHeight = UNKNOWN_CHAIN_HEIGHT;
         RpcConfiguration bestRpcConfiguration = null;
@@ -168,7 +189,12 @@ public class RpcProxyServer {
     }
 
     protected void _relayNotification(final Notification notification) {
-        // TODO
+        final NotificationType notificationType = notification.notificationType;
+        final ZmqNotificationPublisherThread publisherThread = _zmqPublisherThreads.get(notificationType);
+        if (publisherThread != null) {
+            Logger.debug("Relaying: " + notification.notificationType + " " + HexUtil.toHexString(notification.payload.getBytes(0, 32)) + " +" + (notification.payload.getByteCount() - 32));
+            publisherThread.sendMessage(notification);
+        }
     }
 
     protected void _subscribeToNotifications(final RpcConfiguration rpcConfiguration) {
@@ -178,22 +204,22 @@ public class RpcProxyServer {
         }
 
         final BitcoinRpcConnector bitcoinRpcConnector = rpcConfiguration.getBitcoinRpcConnector();
-        final Map<String, String> zmqEndpoints = _getZmqEndpoints(bitcoinRpcConnector);
+        final Map<NotificationType, String> zmqEndpoints = _getZmqEndpoints(rpcConfiguration);
 
-        final Boolean hasBlockEndpoint = zmqEndpoints.containsKey(Notification.MessageType.BLOCK);
-        final Boolean hasBlockHashEndpoint = zmqEndpoints.containsKey(Notification.MessageType.BLOCK_HASH);
+        final Boolean hasBlockEndpoint = zmqEndpoints.containsKey(NotificationType.BLOCK);
+        final Boolean hasBlockHashEndpoint = zmqEndpoints.containsKey(NotificationType.BLOCK_HASH);
 
         final ZmqNotificationThread.Callback callback = new ZmqNotificationThread.Callback() {
             @Override
             public void onNewNotification(final Notification notification) {
                 boolean shouldUpdateChainHeight = false;
                 if (hasBlockHashEndpoint) {
-                    if (Util.areEqual(Notification.MessageType.BLOCK_HASH, notification.messageType)) {
+                    if (Util.areEqual(NotificationType.BLOCK_HASH, notification.notificationType)) {
                         shouldUpdateChainHeight = true;
                     }
                 }
                 else if (hasBlockEndpoint) {
-                    if (Util.areEqual(Notification.MessageType.BLOCK, notification.messageType)) {
+                    if (Util.areEqual(NotificationType.BLOCK, notification.notificationType)) {
                         shouldUpdateChainHeight = true;
                     }
                 }
@@ -206,7 +232,7 @@ public class RpcProxyServer {
                     }
                 }
 
-                final RpcConfiguration bestRpcConfiguration = _selectBestRpcConfiguration(notification.messageType);
+                final RpcConfiguration bestRpcConfiguration = _selectBestRpcConfiguration(notification.notificationType);
                 if ( (bestRpcConfiguration != null) && Util.areEqual(bestRpcConfiguration, rpcConfiguration) ) {
                     // If the notification if from the highest ChainHeight node with ZMQ enabled for this message type, then relay the message.
                     _relayNotification(notification);
@@ -215,7 +241,7 @@ public class RpcProxyServer {
         };
 
         final MutableList<ZmqNotificationThread> zmqNotificationThreads = new MutableList<>();
-        for (final String endpointType : zmqEndpoints.keySet()) {
+        for (final NotificationType endpointType : zmqEndpoints.keySet()) {
             final String endpoint = zmqEndpoints.get(endpointType);
             final ZmqNotificationThread newNotificationThread = new ZmqNotificationThread(endpointType, endpoint, callback);
             zmqNotificationThreads.add(newNotificationThread);
@@ -227,7 +253,7 @@ public class RpcProxyServer {
         }
     }
 
-    public RpcProxyServer(final Integer port, final List<RpcConfiguration> rpcConfigurations) {
+    public RpcProxyServer(final Integer port, final List<RpcConfiguration> rpcConfigurations, final ZmqConfiguration zmqConfiguration) {
         _port = port;
         for (final RpcConfiguration rpcConfiguration : rpcConfigurations) {
             _rpcConfigurations.put(rpcConfiguration, UNKNOWN_CHAIN_HEIGHT);
@@ -239,6 +265,17 @@ public class RpcProxyServer {
             if (chainHeight != null) {
                 _rpcConfigurations.put(rpcConfiguration, chainHeight);
             }
+        }
+
+        if (zmqConfiguration != null) {
+            for (final NotificationType zmqNotificationType : zmqConfiguration.getSupportedMessageTypes()) {
+                final Integer zmqPort = zmqConfiguration.getPort(zmqNotificationType);
+                final ZmqNotificationPublisherThread zmqNotificationPublisherThread = ZmqNotificationPublisherThread.newZmqNotificationPublisherThread(zmqNotificationType, "*", zmqPort);
+                _zmqPublisherThreads.put(zmqNotificationType, zmqNotificationPublisherThread);
+            }
+        }
+        for (final ZmqNotificationPublisherThread zmqNotificationPublisherThread : _zmqPublisherThreads.values()) {
+            zmqNotificationPublisherThread.start();
         }
 
         final Endpoint endpoint;

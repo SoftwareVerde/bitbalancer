@@ -6,7 +6,19 @@
       "port": 8332,
       "isSecure": false,
       "rpcUsername": "",
-      "rpcPassword": ""
+      "rpcPassword": "",
+      "zmqPorts": {
+        "block": 28333,
+        "blockHash": 28332,
+        "transaction": 28334,
+        "transactionHash": 28331
+      }
     }
-  ]
+  ],
+  "zmqPorts": {
+    "block": 28333,
+    "blockHash": 28332,
+    "transaction": 28334,
+    "transactionHash": 28331
+  }
 }

@@ -13,10 +13,10 @@ public class ZmqNotificationThread extends Thread {
         void onNewNotification(Notification notification);
     }
 
-    protected final String _messageType;
+    protected final NotificationType _notificationType;
     protected Callback _callback;
 
-    public ZmqNotificationThread(final String messageType, final String endpointUri, final Callback callback) {
+    public ZmqNotificationThread(final NotificationType notificationType, final String endpointUri, final Callback callback) {
         super(new Runnable() {
             @Override
             public void run() {
@@ -24,40 +24,43 @@ public class ZmqNotificationThread extends Thread {
                     final SocketType socketType = SocketType.type(zmq.ZMQ.ZMQ_SUB);
                     final ZMQ.Socket socket = context.createSocket(socketType);
 
+                    Logger.trace("Listening to: " + endpointUri + " for " + notificationType);
                     socket.connect(endpointUri); // eg: "tcp://host:port"
 
-                    socket.subscribe("rawblock".getBytes());
-                    socket.subscribe("hashblock".getBytes());
-                    socket.subscribe("rawtx".getBytes());
-                    socket.subscribe("hashtx".getBytes());
-
-                    String messageType = null;
-                    ByteArray payload = null;
+                    for (final NotificationType notificationType : NotificationType.values()) {
+                        final String subscriptionString = ZmqMessageTypeConverter.toSubscriptionString(notificationType);
+                        if (subscriptionString != null) {
+                            socket.subscribe(subscriptionString.getBytes());
+                        }
+                    }
 
                     final Thread thread = Thread.currentThread();
                     while (! thread.isInterrupted()) {
                         final ZMsg zMsg = ZMsg.recvMsg(socket);
                         if (zMsg == null) { break; }
 
+                        NotificationType notificationType = null;
+                        ByteArray payload = null;
+
                         int frameIndex = 0;
                         for (final ZFrame zFrame : zMsg) {
-                            final byte[] bytes = zFrame.getData();
+                            final ByteArray bytes = ByteArray.wrap(zFrame.getData());
                             if (frameIndex == 0) {
-                                messageType = new String(bytes);
+                                notificationType = ZmqMessageTypeConverter.fromMessageBytes(bytes);
                             }
                             else if (frameIndex == 1) {
-                                payload = ByteArray.wrap(bytes);
+                                payload = bytes;
                             }
                             else {
                                 break;
                             }
                             ++frameIndex;
                         }
-                    }
 
-                    if ( (messageType != null) && (payload != null) ) {
-                        final Notification notification = new Notification(messageType, payload);
-                        callback.onNewNotification(notification);
+                        if ( (notificationType != null) && (payload != null) ) {
+                            final Notification notification = new Notification(notificationType, payload);
+                            callback.onNewNotification(notification);
+                        }
                     }
                 }
             }
@@ -72,11 +75,11 @@ public class ZmqNotificationThread extends Thread {
         });
         this.setDaemon(true);
 
-        _messageType = messageType;
+        _notificationType = notificationType;
         _callback = callback;
     }
 
-    public String getMessageType() {
-        return _messageType;
+    public NotificationType getMessageType() {
+        return _notificationType;
     }
 }

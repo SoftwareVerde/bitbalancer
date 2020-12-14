@@ -4,13 +4,17 @@ import com.softwareverde.constable.list.mutable.MutableList;
 import com.softwareverde.guvnor.configuration.Configuration;
 import com.softwareverde.guvnor.configuration.ConfigurationParser;
 import com.softwareverde.guvnor.configuration.NodeProperties;
+import com.softwareverde.guvnor.proxy.NotificationType;
 import com.softwareverde.guvnor.proxy.RpcProxyServer;
+import com.softwareverde.guvnor.proxy.ZmqConfigurationCore;
 import com.softwareverde.guvnor.proxy.rpc.RpcConfiguration;
 import com.softwareverde.guvnor.proxy.rpc.RpcCredentials;
 import com.softwareverde.guvnor.proxy.rpc.connector.BitcoinCoreRpcConnector;
 import com.softwareverde.guvnor.proxy.rpc.connector.BitcoinRpcConnector;
 import com.softwareverde.logging.LogLevel;
 import com.softwareverde.logging.Logger;
+
+import java.util.Map;
 
 public class Main {
     protected static Main INSTANCE = null;
@@ -54,7 +58,8 @@ public class Main {
                 final BitcoinNodeAddress bitcoinNodeAddress = new BitcoinNodeAddress(host, port, nodeProperties.isSecure());
                 final RpcCredentials rpcCredentials = new RpcCredentials(nodeProperties.getRpcUsername(), nodeProperties.getRpcPassword());
                 final BitcoinRpcConnector bitcoinRpcConnector = new BitcoinCoreRpcConnector(bitcoinNodeAddress, rpcCredentials);
-                final RpcConfiguration rpcConfiguration = new RpcConfiguration(bitcoinRpcConnector, preferenceOrder);
+                final Map<NotificationType, Integer> zmqPorts = nodeProperties.getZmqPorts();
+                final RpcConfiguration rpcConfiguration = new RpcConfiguration(bitcoinRpcConnector, preferenceOrder, zmqPorts);
 
                 rpcConfigurations.add(rpcConfiguration);
                 Logger.info("Added endpoint: " + preferenceOrder + "=" + host + ":" + port);
@@ -63,7 +68,13 @@ public class Main {
             }
         }
 
-        _rpcProxyServer = new RpcProxyServer(rpcPort, rpcConfigurations);
+        final ZmqConfigurationCore zmqConfiguration = new ZmqConfigurationCore();
+        for (final NotificationType notificationType : NotificationType.values()) {
+            final Integer zmqPort = configuration.getZmqPort(notificationType);
+            zmqConfiguration.setPort(notificationType, zmqPort);
+        }
+
+        _rpcProxyServer = new RpcProxyServer(rpcPort, rpcConfigurations, zmqConfiguration);
     }
 
     public void run() {

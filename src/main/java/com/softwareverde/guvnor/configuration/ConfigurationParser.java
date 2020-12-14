@@ -2,14 +2,26 @@ package com.softwareverde.guvnor.configuration;
 
 import com.softwareverde.constable.list.mutable.MutableList;
 import com.softwareverde.guvnor.Main;
+import com.softwareverde.guvnor.proxy.NotificationType;
 import com.softwareverde.json.Json;
 import com.softwareverde.logging.Logger;
 import com.softwareverde.util.IoUtil;
 import com.softwareverde.util.StringUtil;
 
 import java.io.File;
+import java.util.HashMap;
+import java.util.Map;
 
 public class ConfigurationParser {
+    protected void _extractZmqProperty(final String zmqKeyString, final Json sourceJson, final NotificationType notificationType, final Map<NotificationType, Integer> destinationMap) {
+        if (! sourceJson.hasKey(zmqKeyString)) { return; }
+        final Integer zmqPort = sourceJson.getInteger(zmqKeyString);
+
+        if (zmqPort > 0) {
+            destinationMap.put(notificationType, zmqPort);
+        }
+    }
+
     protected Configuration _parseConfigurationFileContents(final String fileContents) {
         final Json json = Json.parse(fileContents);
 
@@ -30,11 +42,37 @@ public class ConfigurationParser {
             final String rpcUsername = nodeJson.getString("rpcUsername");
             final String rpcPassword = nodeJson.getString("rpcPassword");
 
-            final NodeProperties nodeProperties = new NodeProperties(host, port, isSecure, rpcUsername, rpcPassword);
+            final Map<NotificationType, Integer> nodeZmqPorts;
+            { // Parse Node ZMQ ports...
+                final HashMap<NotificationType, Integer> portMap = new HashMap<>();
+                if (json.hasKey("zmqPorts")) {
+                    final Json nodeZmqPortsJson = nodeJson.get("zmqPorts");
+                    _extractZmqProperty("block", nodeZmqPortsJson, NotificationType.BLOCK, portMap);
+                    _extractZmqProperty("blockHash", nodeZmqPortsJson, NotificationType.BLOCK_HASH, portMap);
+                    _extractZmqProperty("transaction", nodeZmqPortsJson, NotificationType.TRANSACTION, portMap);
+                    _extractZmqProperty("transactionHash", nodeZmqPortsJson, NotificationType.TRANSACTION_HASH, portMap);
+                }
+                nodeZmqPorts = (portMap.isEmpty() ? null : portMap);
+            }
+
+            final NodeProperties nodeProperties = new NodeProperties(host, port, isSecure, rpcUsername, rpcPassword, nodeZmqPorts);
             nodePropertiesList.add(nodeProperties);
         }
 
-        return new Configuration(rpcPort, nodePropertiesList);
+        final Map<NotificationType, Integer> serverZmqPorts;
+        { // Parse Server external ZMQ ports...
+            final HashMap<NotificationType, Integer> portMap = new HashMap<>();
+            if (json.hasKey("zmqPorts")) {
+                final Json zmqPortsJson = json.get("zmqPorts");
+                _extractZmqProperty("block", zmqPortsJson, NotificationType.BLOCK, portMap);
+                _extractZmqProperty("blockHash", zmqPortsJson, NotificationType.BLOCK_HASH, portMap);
+                _extractZmqProperty("transaction", zmqPortsJson, NotificationType.TRANSACTION, portMap);
+                _extractZmqProperty("transactionHash", zmqPortsJson, NotificationType.TRANSACTION_HASH, portMap);
+            }
+            serverZmqPorts = (portMap.isEmpty() ? null : portMap);
+        }
+
+        return new Configuration(rpcPort, nodePropertiesList, serverZmqPorts);
     }
 
     public Configuration parseConfigurationFile(final String fileName) {
