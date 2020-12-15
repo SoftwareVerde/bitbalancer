@@ -33,7 +33,7 @@ public class Main {
     }
 
     protected Main(final String[] arguments) {
-        Logger.setLogLevel(LogLevel.ON);
+        Logger.setLogLevel(LogLevel.DEBUG);
 
         if (arguments.length != 1) {
             System.err.println("Missing Argument: <configuration>");
@@ -63,7 +63,7 @@ public class Main {
                 final RpcConfiguration rpcConfiguration = new RpcConfiguration(name, bitcoinRpcConnector, preferenceOrder, zmqPorts);
 
                 rpcConfigurations.add(rpcConfiguration);
-                Logger.info("Added endpoint: " + preferenceOrder + "=" + host + ":" + port);
+                Logger.info("Added endpoint: " + preferenceOrder + "=" + host + ":" + port + " (" + name + ")");
 
                 preferenceOrder += 1;
             }

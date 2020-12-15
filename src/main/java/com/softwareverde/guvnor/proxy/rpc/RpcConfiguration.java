@@ -90,6 +90,7 @@ public class RpcConfiguration {
 
     @Override
     public String toString() {
+        if (! Util.isBlank(_name)) { return _name; }
         return (_bitcoinRpcConnector.getHost() + ":" + _bitcoinRpcConnector.getPort());
     }
 }

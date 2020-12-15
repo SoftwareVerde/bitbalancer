@@ -1,6 +1,7 @@
 package com.softwareverde.guvnor.proxy;
 
 import com.softwareverde.bitcoin.block.header.difficulty.work.ChainWork;
+import com.softwareverde.concurrent.service.SleepyService;
 import com.softwareverde.constable.list.List;
 import com.softwareverde.constable.list.mutable.MutableList;
 import com.softwareverde.cryptography.hash.sha256.Sha256Hash;
@@ -34,7 +35,11 @@ public class RpcProxyServer {
     protected final ConcurrentHashMap<NotificationType, ZmqNotificationPublisherThread> _zmqPublisherThreads = new ConcurrentHashMap<>();
     protected final ConcurrentHashMap<RpcConfiguration, List<ZmqNotificationThread>> _zmqNotificationThreads = new ConcurrentHashMap<>();
 
-    protected ChainHeight _getChainHeight(final BitcoinRpcConnector bitcoinRpcConnector) {
+    protected final SleepyService _chainWorkMonitor;
+
+    protected ChainHeight _getChainHeight(final RpcConfiguration rpcConfiguration) {
+        final BitcoinRpcConnector bitcoinRpcConnector = rpcConfiguration.getBitcoinRpcConnector();
+
         final byte[] requestPayload;
         { // Build request payload
             final Json json = new Json(false);
@@ -63,7 +68,7 @@ public class RpcProxyServer {
 
             final String errorString = responseJson.getString("error");
             if (! Util.isBlank(errorString)) {
-                Logger.debug(errorString);
+                Logger.debug("Received error from " + rpcConfiguration + ": " + errorString);
                 return null;
             }
 
@@ -120,7 +125,7 @@ public class RpcProxyServer {
 
             final String errorString = responseJson.getString("error");
             if (! Util.isBlank(errorString)) {
-                Logger.debug(errorString);
+                Logger.debug("Received error from " + rpcConfiguration + ": " + errorString);
                 return zmqEndpoints;
             }
 
@@ -176,9 +181,6 @@ public class RpcProxyServer {
                 if (! hasNotificationType) { continue; }
             }
 
-            // Update the node's ChainWork...
-            _rpcConfigurations.put(rpcConfiguration, chainHeight);
-
             final int compareValue = chainHeight.compareTo(bestChainHeight);
             if (compareValue < 0) { continue; }
 
@@ -197,8 +199,24 @@ public class RpcProxyServer {
         final NotificationType notificationType = notification.notificationType;
         final ZmqNotificationPublisherThread publisherThread = _zmqPublisherThreads.get(notificationType);
         if (publisherThread != null) {
-            Logger.trace("Relaying: " + notification.notificationType + " " + HexUtil.toHexString(notification.payload.getBytes(0, 32)) + " +" + (notification.payload.getByteCount() - 32));
             publisherThread.sendMessage(notification);
+        }
+    }
+
+    /**
+     * Refreshes all nodes' chainHeights that fall below `bestChainHeight`.
+     */
+    protected void _updateChainHeights(final ChainHeight bestChainHeight) {
+        for (final RpcConfiguration rpcConfiguration : _rpcConfigurations.keySet()) {
+            final ChainHeight chainHeight = _rpcConfigurations.get(rpcConfiguration);
+
+            if (bestChainHeight.compareTo(chainHeight) > 0) {
+                final ChainHeight newChainHeight = _getChainHeight(rpcConfiguration);
+                if (newChainHeight != null) {
+                    Logger.debug("Updating chainHeight for " + rpcConfiguration + ": " + newChainHeight);
+                    _rpcConfigurations.put(rpcConfiguration, newChainHeight);
+                }
+            }
         }
     }
 
@@ -208,7 +226,6 @@ public class RpcProxyServer {
             if (zmqNotificationThread != null) { return; }
         }
 
-        final BitcoinRpcConnector bitcoinRpcConnector = rpcConfiguration.getBitcoinRpcConnector();
         final Map<NotificationType, String> zmqEndpoints = _getZmqEndpoints(rpcConfiguration);
 
         final Boolean hasBlockEndpoint = zmqEndpoints.containsKey(NotificationType.BLOCK);
@@ -231,15 +248,22 @@ public class RpcProxyServer {
 
                 if (shouldUpdateChainHeight) {
                     // Update the node's ChainWork...
-                    final ChainHeight chainHeight = _getChainHeight(bitcoinRpcConnector);
+                    final ChainHeight chainHeight = _getChainHeight(rpcConfiguration);
                     if (chainHeight != null) {
-                        _rpcConfigurations.put(rpcConfiguration, chainHeight);
+                        Logger.debug("Updating chainHeight for " + rpcConfiguration + ": " + chainHeight);
+                        final ChainHeight oldChainHeight = _rpcConfigurations.put(rpcConfiguration, chainHeight);
+
+                        if (chainHeight.compareTo(oldChainHeight) > 0) {
+                            Logger.debug("New best block detected. Refreshing all nodes' chainHeights.");
+                            _updateChainHeights(chainHeight);
+                        }
                     }
                 }
 
                 final RpcConfiguration bestRpcConfiguration = _selectBestRpcConfiguration(notification.notificationType);
                 if ( (bestRpcConfiguration != null) && Util.areEqual(bestRpcConfiguration, rpcConfiguration) ) {
                     // If the notification if from the highest ChainHeight node with ZMQ enabled for this message type, then relay the message.
+                    Logger.trace("Relaying: " + notification.notificationType + " " + HexUtil.toHexString(notification.payload.getBytes(0, 32)) + " +" + (notification.payload.getByteCount() - 32) + " from " + rpcConfiguration);
                     _relayNotification(notification);
                 }
             }
@@ -265,8 +289,7 @@ public class RpcProxyServer {
             _subscribeToNotifications(rpcConfiguration);
         }
         for (final RpcConfiguration rpcConfiguration : rpcConfigurations) {
-            final BitcoinRpcConnector bitcoinRpcConnector = rpcConfiguration.getBitcoinRpcConnector();
-            final ChainHeight chainHeight = _getChainHeight(bitcoinRpcConnector);
+            final ChainHeight chainHeight = _getChainHeight(rpcConfiguration);
             if (chainHeight != null) {
                 _rpcConfigurations.put(rpcConfiguration, chainHeight);
             }
@@ -320,6 +343,7 @@ public class RpcProxyServer {
 
             @Override
             public void relayNotification(final Notification notification) {
+                Logger.trace("Relaying from notification endpoint: " + notification.notificationType + " " + HexUtil.toHexString(notification.payload.getBytes(0, 32)) + " +" + (notification.payload.getByteCount() - 32));
                 _relayNotification(notification);
             }
         };
@@ -369,14 +393,53 @@ public class RpcProxyServer {
         _httpServer.addEndpoint(blockHashNotifyEndpoint);
         _httpServer.addEndpoint(transactionNotifyEndpoint);
         _httpServer.addEndpoint(transactionHashNotifyEndpoint);
+
+        _chainWorkMonitor = new SleepyService() {
+            @Override
+            protected void _onStart() { }
+
+            @Override
+            protected Boolean _run() {
+                final ChainHeight bestChainHeight;
+                {
+                    final RpcConfiguration bestRpcConfiguration = _selectBestRpcConfiguration();
+                    bestChainHeight = Util.coalesce(_rpcConfigurations.get(bestRpcConfiguration), UNKNOWN_CHAIN_HEIGHT);
+                }
+
+                for (final RpcConfiguration rpcConfiguration : _rpcConfigurations.keySet()) {
+                    final ChainHeight chainHeight = _rpcConfigurations.get(rpcConfiguration);
+
+                    if (bestChainHeight.compareTo(chainHeight) > 0) {
+                        final ChainHeight newChainHeight = _getChainHeight(rpcConfiguration);
+                        if (newChainHeight != null) {
+                            Logger.debug("Updating chainHeight for " + rpcConfiguration + ": " + newChainHeight);
+                            _rpcConfigurations.put(rpcConfiguration, newChainHeight);
+                        }
+                    }
+                }
+
+                try {
+                    Thread.sleep(15000L);
+                    return true;
+                }
+                catch (final Exception Exception) {
+                    return false;
+                }
+            }
+
+            @Override
+            protected void _onSleep() { }
+        };
     }
 
     public void start() {
         _httpServer.start();
+        _chainWorkMonitor.start();
     }
 
     public void stop() {
         _httpServer.stop();
+        _chainWorkMonitor.stop();
     }
 
     public Integer getPort() {
