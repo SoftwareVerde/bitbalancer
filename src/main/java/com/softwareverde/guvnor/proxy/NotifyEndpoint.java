@@ -3,9 +3,12 @@ package com.softwareverde.guvnor.proxy;
 import com.softwareverde.bitcoin.util.StringUtil;
 import com.softwareverde.bitcoin.util.Util;
 import com.softwareverde.constable.bytearray.ByteArray;
+import com.softwareverde.constable.bytearray.MutableByteArray;
 import com.softwareverde.constable.list.List;
+import com.softwareverde.cryptography.hash.sha256.Sha256Hash;
 import com.softwareverde.guvnor.proxy.rpc.RpcConfiguration;
-import com.softwareverde.http.querystring.GetParameters;
+import com.softwareverde.http.HttpMethod;
+import com.softwareverde.http.querystring.PostParameters;
 import com.softwareverde.http.server.servlet.Servlet;
 import com.softwareverde.http.server.servlet.request.Request;
 import com.softwareverde.http.server.servlet.response.Response;
@@ -34,33 +37,49 @@ public class NotifyEndpoint implements Servlet {
 
     @Override
     public Response onRequest(final Request request) {
-        final GetParameters getParameters = request.getGetParameters();
-        final String hostName = getParameters.get("host");
+        if (! Util.areEqual(HttpMethod.POST, request.getMethod())) {
+            final Response errorResponse = new Response();
+            errorResponse.setCode(Response.Codes.BAD_REQUEST);
+            errorResponse.setContent("Invalid method. Required: " + HttpMethod.POST);
+            return errorResponse;
+        }
+
+        final PostParameters postParameters = request.getPostParameters();
+        final String nodeHost = postParameters.get("nodeHost");
+        final String nodeName = postParameters.get("nodeName");
+        final String blockHash = postParameters.get("blockHash");
 
         final ByteArray postData;
         {
-            final String postDataString = StringUtil.bytesToString(request.getRawPostData());
-            postData = ByteArray.fromHexString(postDataString);
+            postData = Util.coalesce(Sha256Hash.fromHexString(blockHash), new MutableByteArray(0));
 
             if ( (_requiredDataLength != null) && (! Util.areEqual(_requiredDataLength, postData.getByteCount())) ) {
-                Logger.debug("Received invalid " + _notificationType + " notification data from: " + hostName);
+                Logger.debug("Received invalid " + _notificationType + " notification data from: " + (nodeHost + " " + nodeName));
 
                 final Response errorResponse = new Response();
                 errorResponse.setCode(Response.Codes.BAD_REQUEST);
-                errorResponse.setContent("Invalid data length. Required: " + _requiredDataLength);
+                errorResponse.setContent("Invalid data length for \"blockHash\". Required: " + _requiredDataLength);
                 return errorResponse;
             }
         }
 
         RpcConfiguration registeredRpcConfiguration = null;
         for (final RpcConfiguration rpcConfiguration : _context.getRpcConfigurations()) {
-            if (Util.areEqual(hostName, rpcConfiguration.getHost())) {
-                registeredRpcConfiguration = rpcConfiguration;
-                break;
+            if (! nodeHost.isEmpty()) {
+                if (Util.areEqual(nodeHost, rpcConfiguration.getHost())) {
+                    registeredRpcConfiguration = rpcConfiguration;
+                    break;
+                }
+            }
+            else {
+                if (Util.areEqual(nodeName, rpcConfiguration.getName())) {
+                    registeredRpcConfiguration = rpcConfiguration;
+                    break;
+                }
             }
         }
         if (registeredRpcConfiguration == null) {
-            Logger.debug("Received " + _notificationType + " notification from unknown host: " + hostName);
+            Logger.debug("Received " + _notificationType + " notification from unknown host: " + (nodeHost + " " + nodeName));
 
             final Response errorResponse = new Response();
             errorResponse.setCode(Response.Codes.SERVER_ERROR);

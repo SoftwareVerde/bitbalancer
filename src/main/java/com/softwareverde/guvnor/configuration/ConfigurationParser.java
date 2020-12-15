@@ -36,6 +36,7 @@ public class ConfigurationParser {
         final MutableList<NodeProperties> nodePropertiesList = new MutableList<>();
         for (int i = 0; i < nodesJson.length(); ++i) {
             final Json nodeJson = nodesJson.get(i);
+            final String name = nodeJson.getString("name");
             final String host = nodeJson.getString("host");
             final Integer port = nodeJson.getInteger("port");
             final Boolean isSecure = nodeJson.get("isSecure", false);
@@ -55,7 +56,7 @@ public class ConfigurationParser {
                 nodeZmqPorts = (portMap.isEmpty() ? null : portMap);
             }
 
-            final NodeProperties nodeProperties = new NodeProperties(host, port, isSecure, rpcUsername, rpcPassword, nodeZmqPorts);
+            final NodeProperties nodeProperties = new NodeProperties(name, host, port, isSecure, rpcUsername, rpcPassword, nodeZmqPorts);
             nodePropertiesList.add(nodeProperties);
         }
 

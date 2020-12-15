@@ -53,13 +53,14 @@ public class Main {
         {
             int preferenceOrder = 0;
             for (final NodeProperties nodeProperties : configuration.getNodeProperties()) {
+                final String name = nodeProperties.getName();
                 final String host = nodeProperties.getHost();
                 final Integer port = nodeProperties.getPort();
                 final BitcoinNodeAddress bitcoinNodeAddress = new BitcoinNodeAddress(host, port, nodeProperties.isSecure());
                 final RpcCredentials rpcCredentials = new RpcCredentials(nodeProperties.getRpcUsername(), nodeProperties.getRpcPassword());
                 final BitcoinRpcConnector bitcoinRpcConnector = new BitcoinCoreRpcConnector(bitcoinNodeAddress, rpcCredentials);
                 final Map<NotificationType, Integer> zmqPorts = nodeProperties.getZmqPorts();
-                final RpcConfiguration rpcConfiguration = new RpcConfiguration(bitcoinRpcConnector, preferenceOrder, zmqPorts);
+                final RpcConfiguration rpcConfiguration = new RpcConfiguration(name, bitcoinRpcConnector, preferenceOrder, zmqPorts);
 
                 rpcConfigurations.add(rpcConfiguration);
                 Logger.info("Added endpoint: " + preferenceOrder + "=" + host + ":" + port);

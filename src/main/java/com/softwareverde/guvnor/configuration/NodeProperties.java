@@ -6,6 +6,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class NodeProperties {
+    protected final String _name;
     protected final String _host;
     protected final Integer _port;
     protected final Boolean _isSecure;
@@ -13,7 +14,8 @@ public class NodeProperties {
     protected final String _rpcPassword;
     protected final Map<NotificationType, Integer> _zmqPorts;
 
-    public NodeProperties(final String host, final Integer port, final Boolean isSecure, final String rpcUsername, final String rpcPassword, final Map<NotificationType, Integer> zmqPorts) {
+    public NodeProperties(final String name, final String host, final Integer port, final Boolean isSecure, final String rpcUsername, final String rpcPassword, final Map<NotificationType, Integer> zmqPorts) {
+        _name = name;
         _host = host;
         _port = port;
         _isSecure = isSecure;
@@ -28,6 +30,8 @@ public class NodeProperties {
             _zmqPorts = null;
         }
     }
+
+    public String getName() { return _name; }
 
     public String getHost() {
         return _host;

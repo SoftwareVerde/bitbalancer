@@ -8,19 +8,21 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class RpcConfiguration {
+    protected final String _name;
     protected final BitcoinRpcConnector _bitcoinRpcConnector;
     protected final Integer _hierarchy;
     protected final HashMap<NotificationType, Integer> _zmqPorts;
 
-    public RpcConfiguration(final BitcoinRpcConnector bitcoinRpcConnector) {
-        this(bitcoinRpcConnector, null);
+    public RpcConfiguration(final String name, final BitcoinRpcConnector bitcoinRpcConnector) {
+        this(name, bitcoinRpcConnector, null);
     }
 
-    public RpcConfiguration(final BitcoinRpcConnector bitcoinRpcConnector, final Integer preferenceOrder) {
-        this(bitcoinRpcConnector, preferenceOrder, null);
+    public RpcConfiguration(final String name, final BitcoinRpcConnector bitcoinRpcConnector, final Integer preferenceOrder) {
+        this(name, bitcoinRpcConnector, preferenceOrder, null);
     }
 
-    public RpcConfiguration(final BitcoinRpcConnector bitcoinRpcConnector, final Integer preferenceOrder, final Map<NotificationType, Integer> zmqPorts) {
+    public RpcConfiguration(final String name, final BitcoinRpcConnector bitcoinRpcConnector, final Integer preferenceOrder, final Map<NotificationType, Integer> zmqPorts) {
+        _name = name;
         _bitcoinRpcConnector = bitcoinRpcConnector;
         _hierarchy = preferenceOrder;
 
@@ -31,6 +33,10 @@ public class RpcConfiguration {
         else {
             _zmqPorts = null;
         }
+    }
+
+    public String getName() {
+        return _name;
     }
 
     public BitcoinRpcConnector getBitcoinRpcConnector() {

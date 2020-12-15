@@ -2,6 +2,7 @@
   "port": 8332,
   "nodes": [
     {
+      "name": "node-00",
       "host": "",
       "port": 8332,
       "isSecure": false,
