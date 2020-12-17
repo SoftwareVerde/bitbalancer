@@ -411,7 +411,7 @@ public class RpcProxyServer {
 
                     if (bestChainHeight.compareTo(chainHeight) > 0) {
                         final ChainHeight newChainHeight = _getChainHeight(rpcConfiguration);
-                        if (newChainHeight != null) {
+                        if ( (newChainHeight != null) && (newChainHeight.compareTo(chainHeight) > 0) ) {
                             Logger.debug("Updating chainHeight for " + rpcConfiguration + ": " + newChainHeight);
                             _rpcConfigurations.put(rpcConfiguration, newChainHeight);
                         }

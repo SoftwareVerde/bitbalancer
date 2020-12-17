@@ -11,6 +11,7 @@ import com.softwareverde.guvnor.proxy.rpc.RpcConfiguration;
 import com.softwareverde.guvnor.proxy.rpc.RpcCredentials;
 import com.softwareverde.guvnor.proxy.rpc.connector.BitcoinCoreRpcConnector;
 import com.softwareverde.guvnor.proxy.rpc.connector.BitcoinRpcConnector;
+import com.softwareverde.logging.LineNumberAnnotatedLog;
 import com.softwareverde.logging.LogLevel;
 import com.softwareverde.logging.Logger;
 
@@ -33,6 +34,7 @@ public class Main {
     }
 
     protected Main(final String[] arguments) {
+        Logger.setLog(LineNumberAnnotatedLog.getInstance());
         Logger.setLogLevel(LogLevel.DEBUG);
 
         if (arguments.length != 1) {
