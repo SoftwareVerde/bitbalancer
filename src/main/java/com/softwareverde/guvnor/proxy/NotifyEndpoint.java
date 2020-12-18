@@ -1,6 +1,5 @@
 package com.softwareverde.guvnor.proxy;
 
-import com.softwareverde.bitcoin.util.StringUtil;
 import com.softwareverde.bitcoin.util.Util;
 import com.softwareverde.constable.bytearray.ByteArray;
 import com.softwareverde.constable.bytearray.MutableByteArray;

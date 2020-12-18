@@ -1,6 +1,5 @@
 package com.softwareverde.guvnor.proxy;
 
-import com.softwareverde.bitcoin.block.header.difficulty.work.ChainWork;
 import com.softwareverde.concurrent.service.SleepyService;
 import com.softwareverde.constable.list.List;
 import com.softwareverde.constable.list.mutable.MutableList;
@@ -36,50 +35,6 @@ public class RpcProxyServer {
     protected final ConcurrentHashMap<RpcConfiguration, List<ZmqNotificationThread>> _zmqNotificationThreads = new ConcurrentHashMap<>();
 
     protected final SleepyService _chainWorkMonitor;
-
-    protected ChainHeight _getChainHeight(final RpcConfiguration rpcConfiguration) {
-        final BitcoinRpcConnector bitcoinRpcConnector = rpcConfiguration.getBitcoinRpcConnector();
-
-        final byte[] requestPayload;
-        { // Build request payload
-            final Json json = new Json(false);
-            json.put("id", NEXT_REQUEST_ID.getAndIncrement());
-            json.put("method", "getblockchaininfo");
-
-            { // Method Parameters
-                final Json paramsJson = new Json(true);
-                json.put("params", paramsJson);
-            }
-
-            requestPayload = StringUtil.stringToBytes(json.toString());
-        }
-
-        final MutableRequest request = new MutableRequest();
-        request.setMethod(HttpMethod.POST);
-        request.setRawPostData(requestPayload);
-        // request.setHeader("host", "127.0.0.1");
-        // request.setHeader("content-length", String.valueOf(requestPayload.length));
-        // request.setHeader("connection", "close");
-
-        final Json resultJson;
-        {
-            final Response response = bitcoinRpcConnector.handleRequest(request);
-            final Json responseJson = Json.parse(StringUtil.bytesToString(response.getContent()));
-
-            final String errorString = responseJson.getString("error");
-            if (! Util.isBlank(errorString)) {
-                Logger.debug("Received error from " + rpcConfiguration + ": " + errorString);
-                return null;
-            }
-
-            resultJson = responseJson.get("result");
-        }
-
-        final Long blockHeight = resultJson.getLong("blocks");
-        final ChainWork chainWork = ChainWork.fromHexString(resultJson.getString("chainwork"));
-
-        return new ChainHeight(blockHeight, chainWork);
-    }
 
     protected Map<NotificationType, String> _getZmqEndpoints(final RpcConfiguration rpcConfiguration) {
         final BitcoinRpcConnector bitcoinRpcConnector = rpcConfiguration.getBitcoinRpcConnector();
@@ -171,10 +126,12 @@ public class RpcProxyServer {
             if (requiredZmqNotificationType != null) {
                 boolean hasNotificationType = false;
                 final List<ZmqNotificationThread> zmqNotifications = _zmqNotificationThreads.get(rpcConfiguration);
-                for (final ZmqNotificationThread zmqNotificationThread : zmqNotifications) {
-                    if (Util.areEqual(requiredZmqNotificationType, zmqNotificationThread.getMessageType())) {
-                        hasNotificationType = true;
-                        break;
+                if (zmqNotifications != null) {
+                    for (final ZmqNotificationThread zmqNotificationThread : zmqNotifications) {
+                        if (Util.areEqual(requiredZmqNotificationType, zmqNotificationThread.getMessageType())) {
+                            hasNotificationType = true;
+                            break;
+                        }
                     }
                 }
 
@@ -209,9 +166,10 @@ public class RpcProxyServer {
     protected void _updateChainHeights(final ChainHeight bestChainHeight) {
         for (final RpcConfiguration rpcConfiguration : _rpcConfigurations.keySet()) {
             final ChainHeight chainHeight = _rpcConfigurations.get(rpcConfiguration);
+            final BitcoinRpcConnector bitcoinRpcConnector = rpcConfiguration.getBitcoinRpcConnector();
 
             if (bestChainHeight.compareTo(chainHeight) > 0) {
-                final ChainHeight newChainHeight = _getChainHeight(rpcConfiguration);
+                final ChainHeight newChainHeight = bitcoinRpcConnector.getChainHeight();
                 if (newChainHeight != null) {
                     Logger.debug("Updating chainHeight for " + rpcConfiguration + ": " + newChainHeight);
                     _rpcConfigurations.put(rpcConfiguration, newChainHeight);
@@ -248,7 +206,8 @@ public class RpcProxyServer {
 
                 if (shouldUpdateChainHeight) {
                     // Update the node's ChainWork...
-                    final ChainHeight chainHeight = _getChainHeight(rpcConfiguration);
+                    final BitcoinRpcConnector bitcoinRpcConnector = rpcConfiguration.getBitcoinRpcConnector();
+                    final ChainHeight chainHeight = bitcoinRpcConnector.getChainHeight();
                     if (chainHeight != null) {
                         Logger.debug("Updating chainHeight for " + rpcConfiguration + ": " + chainHeight);
                         final ChainHeight oldChainHeight = _rpcConfigurations.put(rpcConfiguration, chainHeight);
@@ -289,7 +248,8 @@ public class RpcProxyServer {
             _subscribeToNotifications(rpcConfiguration);
         }
         for (final RpcConfiguration rpcConfiguration : rpcConfigurations) {
-            final ChainHeight chainHeight = _getChainHeight(rpcConfiguration);
+            final BitcoinRpcConnector bitcoinRpcConnector = rpcConfiguration.getBitcoinRpcConnector();
+            final ChainHeight chainHeight = bitcoinRpcConnector.getChainHeight();
             if (chainHeight != null) {
                 _rpcConfigurations.put(rpcConfiguration, chainHeight);
             }
@@ -320,6 +280,11 @@ public class RpcProxyServer {
                     final ChainHeight bestChainHeight = _rpcConfigurations.get(bestRpcConfiguration);
                     Logger.debug("Selected: " + bestRpcConfiguration.getHost() + ":" + bestRpcConfiguration.getPort() + " " + bestChainHeight);
                     return bestRpcConfiguration;
+                }
+
+                @Override
+                public List<RpcConfiguration> getNodes() {
+                    return new MutableList<>(_rpcConfigurations.keySet());
                 }
             };
 
@@ -410,7 +375,8 @@ public class RpcProxyServer {
                     final ChainHeight chainHeight = _rpcConfigurations.get(rpcConfiguration);
 
                     if (bestChainHeight.compareTo(chainHeight) > 0) {
-                        final ChainHeight newChainHeight = _getChainHeight(rpcConfiguration);
+                        final BitcoinRpcConnector bitcoinRpcConnector = rpcConfiguration.getBitcoinRpcConnector();
+                        final ChainHeight newChainHeight = bitcoinRpcConnector.getChainHeight();
                         if ( (newChainHeight != null) && (newChainHeight.compareTo(chainHeight) > 0) ) {
                             Logger.debug("Updating chainHeight for " + rpcConfiguration + ": " + newChainHeight);
                             _rpcConfigurations.put(rpcConfiguration, newChainHeight);

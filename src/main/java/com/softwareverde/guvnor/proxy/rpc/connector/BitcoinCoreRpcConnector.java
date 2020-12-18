@@ -1,22 +1,36 @@
 package com.softwareverde.guvnor.proxy.rpc.connector;
 
+import com.softwareverde.bitcoin.block.Block;
+import com.softwareverde.bitcoin.block.BlockDeflater;
+import com.softwareverde.bitcoin.block.header.difficulty.work.ChainWork;
 import com.softwareverde.constable.bytearray.ByteArray;
 import com.softwareverde.constable.bytearray.MutableByteArray;
 import com.softwareverde.guvnor.BitcoinCoreUtil;
 import com.softwareverde.guvnor.BitcoinNodeAddress;
+import com.softwareverde.guvnor.proxy.rpc.ChainHeight;
 import com.softwareverde.guvnor.proxy.rpc.RpcCredentials;
+import com.softwareverde.http.HttpMethod;
 import com.softwareverde.http.HttpRequest;
 import com.softwareverde.http.HttpResponse;
 import com.softwareverde.http.server.servlet.request.Headers;
 import com.softwareverde.http.server.servlet.request.Request;
 import com.softwareverde.http.server.servlet.response.Response;
+import com.softwareverde.json.Json;
+import com.softwareverde.logging.Logger;
+import com.softwareverde.util.StringUtil;
 import com.softwareverde.util.Util;
 
 import java.util.Collection;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class BitcoinCoreRpcConnector implements BitcoinRpcConnector {
+    protected final AtomicInteger _nextRequestId = new AtomicInteger(1);
     protected final BitcoinNodeAddress _bitcoinNodeAddress;
     protected final RpcCredentials _rpcCredentials;
+
+    protected String _toString() {
+        return (this.getHost() + ":" + this.getPort());
+    }
 
     public BitcoinCoreRpcConnector(final BitcoinNodeAddress bitcoinNodeAddress, final RpcCredentials rpcCredentials) {
         _bitcoinNodeAddress = bitcoinNodeAddress;
@@ -79,5 +93,83 @@ public class BitcoinCoreRpcConnector implements BitcoinRpcConnector {
             response.setContent(BitcoinCoreUtil.getErrorMessage(proxiedResponseCode));
         }
         return response;
+    }
+
+    @Override
+    public ChainHeight getChainHeight() {
+        final byte[] requestPayload;
+        { // Build request payload
+            final Json json = new Json(false);
+            json.put("id", _nextRequestId.getAndIncrement());
+            json.put("method", "getblockchaininfo");
+
+            { // Method Parameters
+                final Json paramsJson = new Json(true);
+                json.put("params", paramsJson);
+            }
+
+            requestPayload = StringUtil.stringToBytes(json.toString());
+        }
+
+        final MutableRequest request = new MutableRequest();
+        request.setMethod(HttpMethod.POST);
+        request.setRawPostData(requestPayload);
+        // request.setHeader("host", "127.0.0.1");
+        // request.setHeader("content-length", String.valueOf(requestPayload.length));
+        // request.setHeader("connection", "close");
+
+        final Json resultJson;
+        {
+            final Response response = this.handleRequest(request);
+            final Json responseJson = Json.parse(StringUtil.bytesToString(response.getContent()));
+
+            final String errorString = responseJson.getString("error");
+            if (! Util.isBlank(errorString)) {
+                Logger.debug("Received error from " + _toString() + ": " + errorString);
+                return null;
+            }
+
+            resultJson = responseJson.get("result");
+        }
+
+        final Long blockHeight = resultJson.getLong("blocks");
+        final ChainWork chainWork = ChainWork.fromHexString(resultJson.getString("chainwork"));
+
+        return new ChainHeight(blockHeight, chainWork);
+    }
+
+    @Override
+    public Boolean validateBlockTemplate(final Block blockTemplate) {
+        final byte[] requestPayload;
+        { // Build request payload
+            final Json json = new Json(false);
+            json.put("id", _nextRequestId.getAndIncrement());
+            json.put("method", "validateblocktemplate");
+
+            { // Method Parameters
+                final BlockDeflater blockDeflater = new BlockDeflater();
+                final ByteArray blockTemplateBytes = blockDeflater.toBytes(blockTemplate);
+
+                final Json paramsJson = new Json(true);
+                paramsJson.add(blockTemplateBytes);
+
+                json.put("params", paramsJson);
+            }
+
+            requestPayload = StringUtil.stringToBytes(json.toString());
+        }
+
+        final MutableRequest request = new MutableRequest();
+        request.setMethod(HttpMethod.POST);
+        request.setRawPostData(requestPayload);
+
+        final Response response = this.handleRequest(request);
+        final Json responseJson = Json.parse(StringUtil.bytesToString(response.getContent()));
+        return responseJson.get("result", false);
+    }
+
+    @Override
+    public String toString() {
+        return _toString();
     }
 }
