@@ -5,6 +5,7 @@ import com.softwareverde.bitcoin.address.AddressInflater;
 import com.softwareverde.bitcoin.block.Block;
 import com.softwareverde.bitcoin.block.MutableBlock;
 import com.softwareverde.bitcoin.block.header.difficulty.Difficulty;
+import com.softwareverde.bitcoin.server.database.BatchRunner;
 import com.softwareverde.bitcoin.transaction.Transaction;
 import com.softwareverde.bitcoin.transaction.TransactionInflater;
 import com.softwareverde.bitcoin.util.Util;
@@ -21,8 +22,9 @@ import com.softwareverde.http.server.servlet.response.Response;
 import com.softwareverde.json.Json;
 import com.softwareverde.logging.Logger;
 import com.softwareverde.util.StringUtil;
+import com.softwareverde.util.timer.NanoTimer;
 
-import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class RpcProxyHandler implements Servlet {
@@ -84,64 +86,101 @@ public class RpcProxyHandler implements Servlet {
     }
 
     protected Response _onGetBlockTemplateFailure(final Request request) {
-        final HashMap<RpcConfiguration, Response> blockTemplateResponses = new HashMap<>();
-        final HashMap<RpcConfiguration, Block> blockTemplates = new HashMap<>();
-        final HashMap<RpcConfiguration, AtomicInteger> countOfValidBlockTemplates = new HashMap<>();
-
-        final List<RpcConfiguration> rpcConfigurations = _nodeSelector.getNodes();
-        for (final RpcConfiguration rpcConfiguration : rpcConfigurations) {
-            final BitcoinRpcConnector bitcoinRpcConnector = rpcConfiguration.getBitcoinRpcConnector();
-            final Response response = bitcoinRpcConnector.handleRequest(request);
-
-            final Block blockTemplate;
-            final Json responseJson = Json.parse(StringUtil.bytesToString(response.getContent()));
-            final String errorString = responseJson.getString("error");
-            if (! Util.isBlank(errorString)) {
-                Logger.debug("Received error from " + rpcConfiguration + ": " + errorString);
-                blockTemplate = null;
-            }
-            else {
-                final Json resultJson = responseJson.get("result");
-                blockTemplate = _assembleBlockTemplate(resultJson);
-            }
-
-            blockTemplateResponses.put(rpcConfiguration, response);
-            blockTemplates.put(rpcConfiguration, blockTemplate);
-            countOfValidBlockTemplates.put(rpcConfiguration, new AtomicInteger(0));
-        }
-
-        for (final RpcConfiguration rpcConfigurationForTemplate : rpcConfigurations) {
-            final Block blockTemplate = blockTemplates.get(rpcConfigurationForTemplate);
-            if (blockTemplate == null) { continue; }
-
-            for (final RpcConfiguration rpcConfigurationForValidation : rpcConfigurations) {
-                final BitcoinRpcConnector bitcoinRpcConnectorForValidation = rpcConfigurationForValidation.getBitcoinRpcConnector();
-                final Boolean isValid = bitcoinRpcConnectorForValidation.validateBlockTemplate(blockTemplate);
-
-                if (isValid) {
-                    final AtomicInteger currentIsValidCount = countOfValidBlockTemplates.get(rpcConfigurationForTemplate);
-                    currentIsValidCount.incrementAndGet();
-                }
-            }
-        }
-
+        boolean wasSuccessful = true;
         int bestValidCount = 0;
         RpcConfiguration bestRpcConfiguration = null;
-        for (final RpcConfiguration rpcConfiguration : rpcConfigurations) {
-            final AtomicInteger countOfValidBlockTemplate = countOfValidBlockTemplates.get(rpcConfiguration);
-            final int validCount = countOfValidBlockTemplate.get();
-            if (validCount > bestValidCount) {
-                bestRpcConfiguration = rpcConfiguration;
-                bestValidCount = validCount;
+
+        final ConcurrentHashMap<RpcConfiguration, Response> blockTemplateResponses = new ConcurrentHashMap<>();
+        final ConcurrentHashMap<RpcConfiguration, Block> blockTemplates = new ConcurrentHashMap<>();
+        final ConcurrentHashMap<RpcConfiguration, AtomicInteger> countOfValidBlockTemplates = new ConcurrentHashMap<>();
+
+        final List<RpcConfiguration> rpcConfigurations = _nodeSelector.getNodes();
+
+        try {
+            final BatchRunner<RpcConfiguration> batchRunner = new BatchRunner<>(1, true);
+            batchRunner.run(rpcConfigurations, new BatchRunner.Batch<RpcConfiguration>() {
+                @Override
+                public void run(final List<RpcConfiguration> rpcConfigurations) {
+                    final NanoTimer nanoTimer = new NanoTimer();
+
+                    final RpcConfiguration rpcConfiguration = rpcConfigurations.get(0); // Workaround for non-specialization of BatchRunner of size 1.
+                    final BitcoinRpcConnector bitcoinRpcConnector = rpcConfiguration.getBitcoinRpcConnector();
+
+                    nanoTimer.start();
+                    final Response response = bitcoinRpcConnector.handleRequest(request);
+                    nanoTimer.stop();
+
+                    final Block blockTemplate;
+                    final Json responseJson = Json.parse(StringUtil.bytesToString(response.getContent()));
+                    final String errorString = responseJson.getString("error");
+                    if (! Util.isBlank(errorString)) {
+                        Logger.debug("Received error from " + rpcConfiguration + ": " + errorString);
+                        blockTemplate = null;
+                    }
+                    else {
+                        final Json resultJson = responseJson.get("result");
+                        blockTemplate = _assembleBlockTemplate(resultJson);
+                    }
+
+                    blockTemplateResponses.put(rpcConfiguration, response);
+                    if (blockTemplate != null) {
+                        blockTemplates.put(rpcConfiguration, blockTemplate);
+                    }
+                    countOfValidBlockTemplates.put(rpcConfiguration, new AtomicInteger(0));
+
+                    Logger.debug("Obtained template from " + rpcConfiguration + " in " + nanoTimer.getMillisecondsElapsed() + "ms.");
+                }
+            });
+
+            for (final RpcConfiguration rpcConfigurationForTemplate : rpcConfigurations) {
+                final Block blockTemplate = blockTemplates.get(rpcConfigurationForTemplate);
+                if (blockTemplate == null) { continue; }
+
+                batchRunner.run(rpcConfigurations, new BatchRunner.Batch<RpcConfiguration>() {
+                    @Override
+                    public void run(final List<RpcConfiguration> rpcConfigurationsForValidation) {
+                        final NanoTimer nanoTimer = new NanoTimer();
+
+                        final RpcConfiguration rpcConfigurationForValidation = rpcConfigurationsForValidation.get(0); // Workaround for non-specialization of BatchRunner of size 1.
+                        final BitcoinRpcConnector bitcoinRpcConnectorForValidation = rpcConfigurationForValidation.getBitcoinRpcConnector();
+
+                        nanoTimer.start();
+                        final Boolean isValid = bitcoinRpcConnectorForValidation.validateBlockTemplate(blockTemplate);
+                        nanoTimer.stop();
+
+                        Logger.debug("Validated template from " + rpcConfigurationForTemplate + " with " + rpcConfigurationForValidation + " in " + nanoTimer.getMillisecondsElapsed() + "ms. (" + (isValid ? "VALID" : "INVALID") + ")");
+
+                        if (isValid) {
+                            final AtomicInteger currentIsValidCount = countOfValidBlockTemplates.get(rpcConfigurationForTemplate);
+                            currentIsValidCount.incrementAndGet();
+                        }
+                    }
+                });
+            }
+
+            for (final RpcConfiguration rpcConfiguration : rpcConfigurations) {
+                final AtomicInteger countOfValidBlockTemplate = countOfValidBlockTemplates.get(rpcConfiguration);
+                final int validCount = countOfValidBlockTemplate.get();
+                if (validCount > bestValidCount) {
+                    bestRpcConfiguration = rpcConfiguration;
+                    bestValidCount = validCount;
+                }
+            }
+            if (bestValidCount < 1) {
+                wasSuccessful = false;
             }
         }
+        catch (final Exception exception) {
+            Logger.warn(exception);
+            wasSuccessful = false;
+        }
 
-        if (bestValidCount < 1) {
+        if (! wasSuccessful) {
             Logger.warn("No valid templates found.");
 
             final Json errorJson = new Json();
             errorJson.put("error", "No valid templates found.");
-            errorJson.put("code", Integer.MAX_VALUE);
+            errorJson.put("code", Integer.MIN_VALUE);
 
             final Response response = new Response();
             response.setCode(Response.Codes.SERVER_ERROR);
