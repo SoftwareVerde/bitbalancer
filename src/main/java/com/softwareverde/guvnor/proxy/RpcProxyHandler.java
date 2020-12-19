@@ -22,6 +22,9 @@ import com.softwareverde.json.Json;
 import com.softwareverde.logging.Logger;
 import com.softwareverde.util.StringUtil;
 
+import java.util.HashMap;
+import java.util.concurrent.atomic.AtomicInteger;
+
 public class RpcProxyHandler implements Servlet {
     public enum Method {
         GET_BLOCK_TEMPLATE("getblocktemplate");
@@ -80,11 +83,83 @@ public class RpcProxyHandler implements Servlet {
         return block;
     }
 
+    protected Response _onGetBlockTemplateFailure(final Request request) {
+        final HashMap<RpcConfiguration, Response> blockTemplateResponses = new HashMap<>();
+        final HashMap<RpcConfiguration, Block> blockTemplates = new HashMap<>();
+        final HashMap<RpcConfiguration, AtomicInteger> countOfValidBlockTemplates = new HashMap<>();
+
+        final List<RpcConfiguration> rpcConfigurations = _nodeSelector.getNodes();
+        for (final RpcConfiguration rpcConfiguration : rpcConfigurations) {
+            final BitcoinRpcConnector bitcoinRpcConnector = rpcConfiguration.getBitcoinRpcConnector();
+            final Response response = bitcoinRpcConnector.handleRequest(request);
+
+            final Block blockTemplate;
+            final Json responseJson = Json.parse(StringUtil.bytesToString(response.getContent()));
+            final String errorString = responseJson.getString("error");
+            if (! Util.isBlank(errorString)) {
+                Logger.debug("Received error from " + rpcConfiguration + ": " + errorString);
+                blockTemplate = null;
+            }
+            else {
+                final Json resultJson = responseJson.get("result");
+                blockTemplate = _assembleBlockTemplate(resultJson);
+            }
+
+            blockTemplateResponses.put(rpcConfiguration, response);
+            blockTemplates.put(rpcConfiguration, blockTemplate);
+            countOfValidBlockTemplates.put(rpcConfiguration, new AtomicInteger(0));
+        }
+
+        for (final RpcConfiguration rpcConfigurationForTemplate : rpcConfigurations) {
+            final Block blockTemplate = blockTemplates.get(rpcConfigurationForTemplate);
+            if (blockTemplate == null) { continue; }
+
+            for (final RpcConfiguration rpcConfigurationForValidation : rpcConfigurations) {
+                final BitcoinRpcConnector bitcoinRpcConnectorForValidation = rpcConfigurationForValidation.getBitcoinRpcConnector();
+                final Boolean isValid = bitcoinRpcConnectorForValidation.validateBlockTemplate(blockTemplate);
+
+                if (isValid) {
+                    final AtomicInteger currentIsValidCount = countOfValidBlockTemplates.get(rpcConfigurationForTemplate);
+                    currentIsValidCount.incrementAndGet();
+                }
+            }
+        }
+
+        int bestValidCount = 0;
+        RpcConfiguration bestRpcConfiguration = null;
+        for (final RpcConfiguration rpcConfiguration : rpcConfigurations) {
+            final AtomicInteger countOfValidBlockTemplate = countOfValidBlockTemplates.get(rpcConfiguration);
+            final int validCount = countOfValidBlockTemplate.get();
+            if (validCount > bestValidCount) {
+                bestRpcConfiguration = rpcConfiguration;
+                bestValidCount = validCount;
+            }
+        }
+
+        if (bestValidCount < 1) {
+            Logger.warn("No valid templates found.");
+
+            final Json errorJson = new Json();
+            errorJson.put("error", "No valid templates found.");
+            errorJson.put("code", Integer.MAX_VALUE);
+
+            final Response response = new Response();
+            response.setCode(Response.Codes.SERVER_ERROR);
+            response.setContent(errorJson.toString());
+            return response;
+        }
+
+        Logger.info("Block template from " + bestRpcConfiguration + " considered valid by " + bestValidCount + " nodes.");
+        return blockTemplateResponses.get(bestRpcConfiguration);
+    }
+
     protected Response _onGetBlockTemplateRequest(final RpcConfiguration bestRpcConfiguration, final Request request) {
         final List<RpcConfiguration> rpcConfigurations = _nodeSelector.getNodes();
         final BitcoinRpcConnector bestBitcoinRpcConnector = bestRpcConfiguration.getBitcoinRpcConnector();
         final Response response = bestBitcoinRpcConnector.handleRequest(request);
         final Json responseJson = Json.parse(StringUtil.bytesToString(response.getContent()));
+
+        final int nodeCount = rpcConfigurations.getCount();
 
         final String errorString = responseJson.getString("error");
         if (! Util.isBlank(errorString)) {
@@ -94,9 +169,14 @@ public class RpcProxyHandler implements Servlet {
 
         final Json resultJson = responseJson.get("result");
         final Block blockTemplate = _assembleBlockTemplate(resultJson);
+        if (blockTemplate == null) {
+            Logger.warn("Unable to assemble block template.");
+            Logger.warn(responseJson);
+
+            return _onGetBlockTemplateFailure(request);
+        }
 
         int validCount = 0;
-        final int nodeCount = rpcConfigurations.getCount();
         for (final RpcConfiguration rpcConfiguration : rpcConfigurations) {
             final BitcoinRpcConnector bitcoinRpcConnector = rpcConfiguration.getBitcoinRpcConnector();
             final Boolean isValid = bitcoinRpcConnector.validateBlockTemplate(blockTemplate);
@@ -105,14 +185,14 @@ public class RpcProxyHandler implements Servlet {
             }
         }
 
+        final Sha256Hash previousBlockHash = blockTemplate.getPreviousBlockHash();
         final int invalidCount = (nodeCount - validCount);
         if (invalidCount > 0) {
             Logger.warn("Block template considered invalid by " + invalidCount + " nodes.");
-        }
-        else {
-            Logger.info("Block template considered valid by all nodes.");
+            return _onGetBlockTemplateFailure(request);
         }
 
+        Logger.info("Block template for height " + previousBlockHash + " considered valid by all nodes.");
         return response;
     }
 
