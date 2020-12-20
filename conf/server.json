@@ -13,7 +13,8 @@
         "blockHash": 28332,
         "transaction": 28334,
         "transactionHash": 28331
-      }
+      },
+      "connector": "DEFAULT"
     }
   ],
   "zmqPorts": {

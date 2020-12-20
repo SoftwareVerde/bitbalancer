@@ -13,8 +13,9 @@ public class NodeProperties {
     protected final String _rpcUsername;
     protected final String _rpcPassword;
     protected final Map<NotificationType, Integer> _zmqPorts;
+    protected final String _connectorIdentifier;
 
-    public NodeProperties(final String name, final String host, final Integer port, final Boolean isSecure, final String rpcUsername, final String rpcPassword, final Map<NotificationType, Integer> zmqPorts) {
+    public NodeProperties(final String name, final String host, final Integer port, final Boolean isSecure, final String rpcUsername, final String rpcPassword, final Map<NotificationType, Integer> zmqPorts, final String connectorIdentifier) {
         _name = name;
         _host = host;
         _port = port;
@@ -29,6 +30,8 @@ public class NodeProperties {
         else {
             _zmqPorts = null;
         }
+
+        _connectorIdentifier = connectorIdentifier;
     }
 
     public String getName() { return _name; }
@@ -55,5 +58,9 @@ public class NodeProperties {
 
     public Map<NotificationType, Integer> getZmqPorts() {
         return _zmqPorts;
+    }
+
+    public String getConnectorIdentifier() {
+        return _connectorIdentifier;
     }
 }

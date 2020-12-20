@@ -24,6 +24,8 @@ import java.util.Collection;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class BitcoinCoreRpcConnector implements BitcoinRpcConnector {
+    public static final String IDENTIFIER = "DEFAULT";
+
     protected final AtomicInteger _nextRequestId = new AtomicInteger(1);
     protected final BitcoinNodeAddress _bitcoinNodeAddress;
     protected final RpcCredentials _rpcCredentials;

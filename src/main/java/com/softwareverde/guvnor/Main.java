@@ -11,6 +11,7 @@ import com.softwareverde.guvnor.proxy.rpc.RpcConfiguration;
 import com.softwareverde.guvnor.proxy.rpc.RpcCredentials;
 import com.softwareverde.guvnor.proxy.rpc.connector.BitcoinCoreRpcConnector;
 import com.softwareverde.guvnor.proxy.rpc.connector.BitcoinRpcConnector;
+import com.softwareverde.guvnor.proxy.rpc.connector.NoValidationBitcoinCoreRpcConnector;
 import com.softwareverde.logging.LineNumberAnnotatedLog;
 import com.softwareverde.logging.LogLevel;
 import com.softwareverde.logging.Logger;
@@ -60,7 +61,20 @@ public class Main {
                 final Integer port = nodeProperties.getPort();
                 final BitcoinNodeAddress bitcoinNodeAddress = new BitcoinNodeAddress(host, port, nodeProperties.isSecure());
                 final RpcCredentials rpcCredentials = new RpcCredentials(nodeProperties.getRpcUsername(), nodeProperties.getRpcPassword());
-                final BitcoinRpcConnector bitcoinRpcConnector = new BitcoinCoreRpcConnector(bitcoinNodeAddress, rpcCredentials);
+                final BitcoinRpcConnector bitcoinRpcConnector;
+                {
+                    final String connectorIdentifier = nodeProperties.getConnectorIdentifier();;
+                    switch (connectorIdentifier) {
+                        case NoValidationBitcoinCoreRpcConnector.IDENTIFIER: {
+                            bitcoinRpcConnector = new NoValidationBitcoinCoreRpcConnector(bitcoinNodeAddress, rpcCredentials);
+                        } break;
+
+                        case BitcoinCoreRpcConnector.IDENTIFIER:
+                        default: {
+                            bitcoinRpcConnector = new BitcoinCoreRpcConnector(bitcoinNodeAddress, rpcCredentials);
+                        } break;
+                    }
+                }
                 final Map<NotificationType, Integer> zmqPorts = nodeProperties.getZmqPorts();
                 final RpcConfiguration rpcConfiguration = new RpcConfiguration(name, bitcoinRpcConnector, preferenceOrder, zmqPorts);
 

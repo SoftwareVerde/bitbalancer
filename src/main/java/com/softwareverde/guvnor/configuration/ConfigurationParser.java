@@ -3,6 +3,8 @@ package com.softwareverde.guvnor.configuration;
 import com.softwareverde.constable.list.mutable.MutableList;
 import com.softwareverde.guvnor.Main;
 import com.softwareverde.guvnor.proxy.NotificationType;
+import com.softwareverde.guvnor.proxy.rpc.connector.BitcoinCoreRpcConnector;
+import com.softwareverde.guvnor.proxy.rpc.connector.NoValidationBitcoinCoreRpcConnector;
 import com.softwareverde.json.Json;
 import com.softwareverde.logging.Logger;
 import com.softwareverde.util.IoUtil;
@@ -56,7 +58,22 @@ public class ConfigurationParser {
                 nodeZmqPorts = (portMap.isEmpty() ? null : portMap);
             }
 
-            final NodeProperties nodeProperties = new NodeProperties(name, host, port, isSecure, rpcUsername, rpcPassword, nodeZmqPorts);
+            final String connectorIdentifier;
+            { // Parse the connector identifier...
+                final String identifier = nodeJson.get("connector", "DEFAULT").toUpperCase();
+                switch (identifier) {
+                    case BitcoinCoreRpcConnector.IDENTIFIER:
+                    case NoValidationBitcoinCoreRpcConnector.IDENTIFIER: {
+                        connectorIdentifier = identifier;
+                    } break;
+
+                    default: {
+                        connectorIdentifier = "DEFAULT";
+                    }
+                }
+            }
+
+            final NodeProperties nodeProperties = new NodeProperties(name, host, port, isSecure, rpcUsername, rpcPassword, nodeZmqPorts, connectorIdentifier);
             nodePropertiesList.add(nodeProperties);
         }
 
