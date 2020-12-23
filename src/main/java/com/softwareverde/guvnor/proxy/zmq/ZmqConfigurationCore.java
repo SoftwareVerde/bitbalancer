@@ -1,7 +1,8 @@
-package com.softwareverde.guvnor.proxy;
+package com.softwareverde.guvnor.proxy.zmq;
 
 import com.softwareverde.constable.list.List;
 import com.softwareverde.constable.list.mutable.MutableList;
+import com.softwareverde.guvnor.proxy.NotificationType;
 
 import java.util.HashMap;
 

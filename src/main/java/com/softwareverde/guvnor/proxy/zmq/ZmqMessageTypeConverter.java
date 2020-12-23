@@ -1,6 +1,7 @@
-package com.softwareverde.guvnor.proxy;
+package com.softwareverde.guvnor.proxy.zmq;
 
 import com.softwareverde.constable.bytearray.ByteArray;
+import com.softwareverde.guvnor.proxy.NotificationType;
 import com.softwareverde.util.StringUtil;
 
 public class ZmqMessageTypeConverter {

@@ -8,6 +8,24 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class RpcConfiguration {
+//    public static Map<NotificationType, String> getZmqEndpoints(final RpcConfiguration rpcConfiguration) {
+//        if (rpcConfiguration.hasZmqPorts()) {
+//            final String baseEndpointUri = ("tcp://" + rpcConfiguration.getHost() + ":");
+//            final HashMap<NotificationType, String> zmqEndpoints = new HashMap<>();
+//            for (final NotificationType notificationType : NotificationType.values()) {
+//                final Integer zmqPort = rpcConfiguration.getZmqPort(notificationType);
+//                if (zmqPort == null) { continue; }
+//
+//                final String endpointUri = (baseEndpointUri + zmqPort);
+//                zmqEndpoints.put(notificationType, endpointUri);
+//            }
+//            return zmqEndpoints;
+//        }
+//
+//        final BitcoinRpcConnector bitcoinRpcConnector = rpcConfiguration.getBitcoinRpcConnector();
+//        return bitcoinRpcConnector.getZmqEndpoints();
+//    }
+
     protected final String _name;
     protected final BitcoinRpcConnector _bitcoinRpcConnector;
     protected final Integer _hierarchy;

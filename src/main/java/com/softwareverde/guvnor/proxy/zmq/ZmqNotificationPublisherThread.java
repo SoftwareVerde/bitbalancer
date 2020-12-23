@@ -1,6 +1,8 @@
-package com.softwareverde.guvnor.proxy;
+package com.softwareverde.guvnor.proxy.zmq;
 
 import com.softwareverde.constable.bytearray.ByteArray;
+import com.softwareverde.guvnor.proxy.Notification;
+import com.softwareverde.guvnor.proxy.NotificationType;
 import com.softwareverde.logging.Logger;
 import org.zeromq.SocketType;
 import org.zeromq.ZContext;

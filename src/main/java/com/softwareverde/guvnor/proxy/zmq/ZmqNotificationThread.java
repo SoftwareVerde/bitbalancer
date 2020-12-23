@@ -1,6 +1,9 @@
-package com.softwareverde.guvnor.proxy;
+package com.softwareverde.guvnor.proxy.zmq;
 
 import com.softwareverde.constable.bytearray.ByteArray;
+import com.softwareverde.guvnor.proxy.Notification;
+import com.softwareverde.guvnor.proxy.NotificationType;
+import com.softwareverde.guvnor.proxy.rpc.NotificationCallback;
 import com.softwareverde.logging.Logger;
 import org.zeromq.SocketType;
 import org.zeromq.ZContext;
@@ -9,14 +12,10 @@ import org.zeromq.ZMQ;
 import org.zeromq.ZMsg;
 
 public class ZmqNotificationThread extends Thread {
-    public interface Callback {
-        void onNewNotification(Notification notification);
-    }
-
     protected final NotificationType _notificationType;
-    protected Callback _callback;
+    protected NotificationCallback _callback;
 
-    public ZmqNotificationThread(final NotificationType notificationType, final String endpointUri, final Callback callback) {
+    public ZmqNotificationThread(final NotificationType notificationType, final String endpointUri, final NotificationCallback callback) {
         super(new Runnable() {
             @Override
             public void run() {

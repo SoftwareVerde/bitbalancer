@@ -8,9 +8,11 @@ import com.softwareverde.constable.bytearray.MutableByteArray;
 import com.softwareverde.guvnor.BitcoinCoreUtil;
 import com.softwareverde.guvnor.BitcoinNodeAddress;
 import com.softwareverde.guvnor.proxy.NotificationType;
-import com.softwareverde.guvnor.proxy.ZmqMessageTypeConverter;
 import com.softwareverde.guvnor.proxy.rpc.ChainHeight;
+import com.softwareverde.guvnor.proxy.rpc.NotificationCallback;
 import com.softwareverde.guvnor.proxy.rpc.RpcCredentials;
+import com.softwareverde.guvnor.proxy.zmq.ZmqMessageTypeConverter;
+import com.softwareverde.guvnor.proxy.zmq.ZmqNotificationThread;
 import com.softwareverde.http.HttpMethod;
 import com.softwareverde.http.HttpRequest;
 import com.softwareverde.http.HttpResponse;
@@ -34,13 +36,96 @@ public class BitcoinCoreRpcConnector implements BitcoinRpcConnector {
     protected final BitcoinNodeAddress _bitcoinNodeAddress;
     protected final RpcCredentials _rpcCredentials;
 
+    protected final Map<NotificationType, ZmqNotificationThread> _zmqNotificationThreads = new HashMap<>();
+    protected Map<NotificationType, String> _zmqEndpoints = null;
+
     protected String _toString() {
         return (this.getHost() + ":" + this.getPort());
+    }
+
+    protected Map<NotificationType, String> _getZmqEndpoints() {
+        final String host = _bitcoinNodeAddress.getHost();
+        final String baseEndpointUri = ("tcp://" + host + ":");
+
+        final byte[] requestPayload;
+        { // Build request payload
+            final Json json = new Json(false);
+            json.put("id", _nextRequestId.getAndIncrement());
+            json.put("method", "getzmqnotifications");
+
+            { // Method Parameters
+                final Json paramsJson = new Json(true);
+                json.put("params", paramsJson);
+            }
+
+            requestPayload = StringUtil.stringToBytes(json.toString());
+        }
+
+        Logger.trace("Attempting to collect ZMQ configuration for node: " + _toString());
+
+        final MutableRequest request = new MutableRequest();
+        request.setMethod(HttpMethod.POST);
+        request.setRawPostData(requestPayload);
+
+        final HashMap<NotificationType, String> zmqEndpoints = new HashMap<>();
+        final Json resultJson;
+        {
+            final Response response = this.handleRequest(request);
+            final String rawResponse = StringUtil.bytesToString(response.getContent()).trim();
+            if (! Json.isJson(rawResponse)) {
+                Logger.debug("Received error from " + _toString() +": " + rawResponse.replaceAll("[\\n\\r]+", "/"));
+                return zmqEndpoints;
+            }
+            final Json responseJson = Json.parse(rawResponse);
+
+            final String errorString = responseJson.getString("error");
+            if (! Util.isBlank(errorString)) {
+                Logger.debug("Received error from " + _toString() + ": " + errorString);
+                return zmqEndpoints;
+            }
+
+            resultJson = responseJson.get("result");
+        }
+
+        for (int i = 0; i < resultJson.length(); ++i) {
+            final Json configJson = resultJson.get(i);
+            final String messageTypeString = configJson.getString("type");
+            final NotificationType notificationType = ZmqMessageTypeConverter.fromPublishString(messageTypeString);
+            final String address = configJson.getString("address");
+
+            final Integer port;
+            {
+                final int colonIndex = address.lastIndexOf(':');
+                if (colonIndex < 0) { continue; }
+
+                final int portBeginIndex = (colonIndex + 1);
+                if (portBeginIndex >= address.length()) { continue; }
+
+                port = Util.parseInt(address.substring(portBeginIndex));
+            }
+
+            final String endpointUri = (baseEndpointUri + port);
+            zmqEndpoints.put(notificationType, endpointUri);
+        }
+
+        return zmqEndpoints;
     }
 
     public BitcoinCoreRpcConnector(final BitcoinNodeAddress bitcoinNodeAddress, final RpcCredentials rpcCredentials) {
         _bitcoinNodeAddress = bitcoinNodeAddress;
         _rpcCredentials = rpcCredentials;
+    }
+
+    public void setZmqEndpoint(final NotificationType notificationType, final String endpointUri) {
+        if (_zmqEndpoints == null) {
+            _zmqEndpoints = new HashMap<>();
+        }
+
+        _zmqEndpoints.put(notificationType, endpointUri);
+    }
+
+    public void clearZmqEndpoints() {
+        _zmqEndpoints = null;
     }
 
     @Override
@@ -188,72 +273,46 @@ public class BitcoinCoreRpcConnector implements BitcoinRpcConnector {
     }
 
     @Override
-    public Map<NotificationType, String> getZmqEndpoints() {
-        final String host = _bitcoinNodeAddress.getHost();
-        final String baseEndpointUri = ("tcp://" + host + ":");
-
-        final byte[] requestPayload;
-        { // Build request payload
-            final Json json = new Json(false);
-            json.put("id", _nextRequestId.getAndIncrement());
-            json.put("method", "getzmqnotifications");
-
-            { // Method Parameters
-                final Json paramsJson = new Json(true);
-                json.put("params", paramsJson);
-            }
-
-            requestPayload = StringUtil.stringToBytes(json.toString());
+    public Boolean supportsNotifications() {
+        if (_zmqEndpoints == null) {
+            _zmqEndpoints = _getZmqEndpoints();
         }
 
-        Logger.trace("Attempting to collect ZMQ configuration for node: " + _toString());
+        return _zmqEndpoints.isEmpty();
+    }
 
-        final MutableRequest request = new MutableRequest();
-        request.setMethod(HttpMethod.POST);
-        request.setRawPostData(requestPayload);
+    @Override
+    public Boolean supportsNotification(final NotificationType notificationType) {
+        final Map<NotificationType, String> zmqEndpoints = _zmqEndpoints;
+        if (zmqEndpoints == null) { return false; }
 
-        final HashMap<NotificationType, String> zmqEndpoints = new HashMap<>();
-        final Json resultJson;
-        {
-            final Response response = this.handleRequest(request);
-            final String rawResponse = StringUtil.bytesToString(response.getContent()).trim();
-            if (! Json.isJson(rawResponse)) {
-                Logger.debug("Received error from " + _toString() +": " + rawResponse.replaceAll("[\\n\\r]+", "/"));
-                return zmqEndpoints;
-            }
-            final Json responseJson = Json.parse(rawResponse);
+        return (zmqEndpoints.get(notificationType) != null);
+    }
 
-            final String errorString = responseJson.getString("error");
-            if (! Util.isBlank(errorString)) {
-                Logger.debug("Received error from " + _toString() + ": " + errorString);
-                return zmqEndpoints;
-            }
-
-            resultJson = responseJson.get("result");
+    @Override
+    public void subscribeToNotifications(final NotificationCallback notificationCallback) {
+        Map<NotificationType, String> zmqEndpoints = _zmqEndpoints;
+        if (zmqEndpoints == null) {
+            zmqEndpoints = _getZmqEndpoints();
+            _zmqEndpoints = zmqEndpoints;
         }
+        if (zmqEndpoints == null) { return; }
 
-        for (int i = 0; i < resultJson.length(); ++i) {
-            final Json configJson = resultJson.get(i);
-            final String messageTypeString = configJson.getString("type");
-            final NotificationType notificationType = ZmqMessageTypeConverter.fromPublishString(messageTypeString);
-            final String address = configJson.getString("address");
-
-            final Integer port;
-            {
-                final int colonIndex = address.lastIndexOf(':');
-                if (colonIndex < 0) { continue; }
-
-                final int portBeginIndex = (colonIndex + 1);
-                if (portBeginIndex >= address.length()) { continue; }
-
-                port = Util.parseInt(address.substring(portBeginIndex));
-            }
-
-            final String endpointUri = (baseEndpointUri + port);
-            zmqEndpoints.put(notificationType, endpointUri);
+        for (final NotificationType notificationType : zmqEndpoints.keySet()) {
+            final String endpointUri = zmqEndpoints.get(notificationType);
+            final ZmqNotificationThread zmqNotificationThread = new ZmqNotificationThread(notificationType, endpointUri, notificationCallback);
+            _zmqNotificationThreads.put(notificationType, zmqNotificationThread);
+            zmqNotificationThread.start();
         }
+    }
 
-        return zmqEndpoints;
+    @Override
+    public void unsubscribeToNotifications() {
+        for (final ZmqNotificationThread zmqNotificationThread : _zmqNotificationThreads.values()) {
+            zmqNotificationThread.interrupt();
+            try { zmqNotificationThread.join(); } catch (final Exception exception) { }
+        }
+        _zmqNotificationThreads.clear();
     }
 
     @Override

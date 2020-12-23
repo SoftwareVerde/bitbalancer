@@ -10,17 +10,19 @@ import com.softwareverde.bitcoin.util.StringUtil;
 import com.softwareverde.concurrent.pool.MainThreadPool;
 import com.softwareverde.concurrent.pool.ThreadPool;
 import com.softwareverde.constable.bytearray.ByteArray;
+import com.softwareverde.cryptography.hash.sha256.Sha256Hash;
 import com.softwareverde.guvnor.BitcoinNodeAddress;
+import com.softwareverde.guvnor.proxy.Notification;
 import com.softwareverde.guvnor.proxy.NotificationType;
 import com.softwareverde.guvnor.proxy.rpc.ChainHeight;
+import com.softwareverde.guvnor.proxy.rpc.NotificationCallback;
 import com.softwareverde.guvnor.proxy.rpc.RpcCredentials;
 import com.softwareverde.http.server.servlet.request.Request;
 import com.softwareverde.http.server.servlet.response.Response;
 import com.softwareverde.json.Json;
 import com.softwareverde.logging.Logger;
-
-import java.util.HashMap;
-import java.util.Map;
+import com.softwareverde.network.socket.JsonSocket;
+import com.softwareverde.util.Util;
 
 public class BitcoinVerdeRpcConnector implements BitcoinRpcConnector {
     public static final String IDENTIFIER = "VERDE";
@@ -62,6 +64,8 @@ public class BitcoinVerdeRpcConnector implements BitcoinRpcConnector {
     protected final ThreadPool _threadPool;
     protected final BitcoinNodeAddress _bitcoinNodeAddress;
     protected final RpcCredentials _rpcCredentials;
+
+    protected JsonSocket _socketConnection = null;
 
     protected String _toString() {
         return (this.getHost() + ":" + this.getPort());
@@ -195,15 +199,55 @@ public class BitcoinVerdeRpcConnector implements BitcoinRpcConnector {
         // TODO: What about mempool synchronization?
         try (final NodeJsonRpcConnection nodeJsonRpcConnection = new NodeJsonRpcConnection(host, port, _threadPool)) {
             final Json responseJson = nodeJsonRpcConnection.validatePrototypeBlock(blockTemplate);
-            Logger.debug(responseJson);
             final Json validationResult = responseJson.get("blockValidation");
             return validationResult.getBoolean("isValid");
         }
     }
 
     @Override
-    public Map<NotificationType, String> getZmqEndpoints() {
-        return new HashMap<>();
+    public Boolean supportsNotifications() {
+        return true;
+    }
+
+    @Override
+    public Boolean supportsNotification(final NotificationType notificationType) {
+        return (Util.areEqual(NotificationType.BLOCK_HASH, notificationType) || Util.areEqual(NotificationType.TRANSACTION_HASH, notificationType));
+    }
+
+    @Override
+    public void subscribeToNotifications(final NotificationCallback notificationCallback) {
+        if (_socketConnection != null) { return; }
+
+        final String host = _bitcoinNodeAddress.getHost();
+        final Integer port = _bitcoinNodeAddress.getPort();
+        final NodeJsonRpcConnection nodeJsonRpcConnection = new NodeJsonRpcConnection(host, port, _threadPool);
+        nodeJsonRpcConnection.upgradeToAnnouncementHook(new NodeJsonRpcConnection.AnnouncementHookCallback() {
+            @Override
+            public void onNewBlockHeader(final Json json) {
+                final String blockHashString = json.getString("hash");
+                final Sha256Hash blockHash = Sha256Hash.fromHexString(blockHashString);
+                Logger.debug("Block: " + blockHash);
+
+                final Notification notification = new Notification(NotificationType.BLOCK_HASH, blockHash);
+                notificationCallback.onNewNotification(notification);
+            }
+
+            @Override
+            public void onNewTransaction(final Json json) {
+                final String transactionHashString = json.getString("hash");
+                final Sha256Hash transactionHash = Sha256Hash.fromHexString(transactionHashString);
+                Logger.debug("Transaction: " + transactionHash);
+
+                final Notification notification = new Notification(NotificationType.TRANSACTION_HASH, transactionHash);
+                notificationCallback.onNewNotification(notification);
+            }
+        });
+        _socketConnection = nodeJsonRpcConnection.getJsonSocket();
+    }
+
+    @Override
+    public void unsubscribeToNotifications() {
+        _socketConnection.close();
     }
 
     @Override
