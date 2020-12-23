@@ -11,6 +11,7 @@ import com.softwareverde.guvnor.proxy.rpc.RpcConfiguration;
 import com.softwareverde.guvnor.proxy.rpc.RpcCredentials;
 import com.softwareverde.guvnor.proxy.rpc.connector.BitcoinCoreRpcConnector;
 import com.softwareverde.guvnor.proxy.rpc.connector.BitcoinRpcConnector;
+import com.softwareverde.guvnor.proxy.rpc.connector.BitcoinVerdeRpcConnector;
 import com.softwareverde.guvnor.proxy.rpc.connector.NoValidationBitcoinCoreRpcConnector;
 import com.softwareverde.logging.LineNumberAnnotatedLog;
 import com.softwareverde.logging.LogLevel;
@@ -67,6 +68,10 @@ public class Main {
                     switch (connectorIdentifier) {
                         case NoValidationBitcoinCoreRpcConnector.IDENTIFIER: {
                             bitcoinRpcConnector = new NoValidationBitcoinCoreRpcConnector(bitcoinNodeAddress, rpcCredentials);
+                        } break;
+
+                        case BitcoinVerdeRpcConnector.IDENTIFIER: {
+                            bitcoinRpcConnector = new BitcoinVerdeRpcConnector(bitcoinNodeAddress, rpcCredentials);
                         } break;
 
                         case BitcoinCoreRpcConnector.IDENTIFIER:

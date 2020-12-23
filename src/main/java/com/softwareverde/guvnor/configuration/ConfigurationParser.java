@@ -4,6 +4,7 @@ import com.softwareverde.constable.list.mutable.MutableList;
 import com.softwareverde.guvnor.Main;
 import com.softwareverde.guvnor.proxy.NotificationType;
 import com.softwareverde.guvnor.proxy.rpc.connector.BitcoinCoreRpcConnector;
+import com.softwareverde.guvnor.proxy.rpc.connector.BitcoinVerdeRpcConnector;
 import com.softwareverde.guvnor.proxy.rpc.connector.NoValidationBitcoinCoreRpcConnector;
 import com.softwareverde.json.Json;
 import com.softwareverde.logging.Logger;
@@ -63,6 +64,7 @@ public class ConfigurationParser {
                 final String identifier = nodeJson.get("connector", "DEFAULT").toUpperCase();
                 switch (identifier) {
                     case BitcoinCoreRpcConnector.IDENTIFIER:
+                    case BitcoinVerdeRpcConnector.IDENTIFIER:
                     case NoValidationBitcoinCoreRpcConnector.IDENTIFIER: {
                         connectorIdentifier = identifier;
                     } break;

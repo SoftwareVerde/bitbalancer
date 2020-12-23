@@ -7,6 +7,8 @@ import com.softwareverde.constable.bytearray.ByteArray;
 import com.softwareverde.constable.bytearray.MutableByteArray;
 import com.softwareverde.guvnor.BitcoinCoreUtil;
 import com.softwareverde.guvnor.BitcoinNodeAddress;
+import com.softwareverde.guvnor.proxy.NotificationType;
+import com.softwareverde.guvnor.proxy.ZmqMessageTypeConverter;
 import com.softwareverde.guvnor.proxy.rpc.ChainHeight;
 import com.softwareverde.guvnor.proxy.rpc.RpcCredentials;
 import com.softwareverde.http.HttpMethod;
@@ -21,6 +23,8 @@ import com.softwareverde.util.StringUtil;
 import com.softwareverde.util.Util;
 
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class BitcoinCoreRpcConnector implements BitcoinRpcConnector {
@@ -123,7 +127,12 @@ public class BitcoinCoreRpcConnector implements BitcoinRpcConnector {
         final Json resultJson;
         {
             final Response response = this.handleRequest(request);
-            final Json responseJson = Json.parse(StringUtil.bytesToString(response.getContent()));
+            final String rawResponse = StringUtil.bytesToString(response.getContent()).trim();
+            if (! Json.isJson(rawResponse)) {
+                Logger.debug("Received error from " + _toString() +": " + rawResponse.replaceAll("[\\n\\r]+", "/"));
+                return null;
+            }
+            final Json responseJson = Json.parse(rawResponse);
 
             final String errorString = responseJson.getString("error");
             if (! Util.isBlank(errorString)) {
@@ -165,9 +174,86 @@ public class BitcoinCoreRpcConnector implements BitcoinRpcConnector {
         request.setMethod(HttpMethod.POST);
         request.setRawPostData(requestPayload);
 
+        final Boolean returnValueOnError = false;
+
         final Response response = this.handleRequest(request);
-        final Json responseJson = Json.parse(StringUtil.bytesToString(response.getContent()));
-        return responseJson.get("result", false);
+        final String rawResponse = StringUtil.bytesToString(response.getContent()).trim();
+        if (! Json.isJson(rawResponse)) {
+            Logger.debug("Received error from " + _toString() +": " + rawResponse.replaceAll("[\\n\\r]+", "/"));
+            return returnValueOnError;
+        }
+
+        final Json responseJson = Json.parse(rawResponse);
+        return responseJson.get("result", returnValueOnError);
+    }
+
+    @Override
+    public Map<NotificationType, String> getZmqEndpoints() {
+        final String host = _bitcoinNodeAddress.getHost();
+        final String baseEndpointUri = ("tcp://" + host + ":");
+
+        final byte[] requestPayload;
+        { // Build request payload
+            final Json json = new Json(false);
+            json.put("id", _nextRequestId.getAndIncrement());
+            json.put("method", "getzmqnotifications");
+
+            { // Method Parameters
+                final Json paramsJson = new Json(true);
+                json.put("params", paramsJson);
+            }
+
+            requestPayload = StringUtil.stringToBytes(json.toString());
+        }
+
+        Logger.trace("Attempting to collect ZMQ configuration for node: " + _toString());
+
+        final MutableRequest request = new MutableRequest();
+        request.setMethod(HttpMethod.POST);
+        request.setRawPostData(requestPayload);
+
+        final HashMap<NotificationType, String> zmqEndpoints = new HashMap<>();
+        final Json resultJson;
+        {
+            final Response response = this.handleRequest(request);
+            final String rawResponse = StringUtil.bytesToString(response.getContent()).trim();
+            if (! Json.isJson(rawResponse)) {
+                Logger.debug("Received error from " + _toString() +": " + rawResponse.replaceAll("[\\n\\r]+", "/"));
+                return zmqEndpoints;
+            }
+            final Json responseJson = Json.parse(rawResponse);
+
+            final String errorString = responseJson.getString("error");
+            if (! Util.isBlank(errorString)) {
+                Logger.debug("Received error from " + _toString() + ": " + errorString);
+                return zmqEndpoints;
+            }
+
+            resultJson = responseJson.get("result");
+        }
+
+        for (int i = 0; i < resultJson.length(); ++i) {
+            final Json configJson = resultJson.get(i);
+            final String messageTypeString = configJson.getString("type");
+            final NotificationType notificationType = ZmqMessageTypeConverter.fromPublishString(messageTypeString);
+            final String address = configJson.getString("address");
+
+            final Integer port;
+            {
+                final int colonIndex = address.lastIndexOf(':');
+                if (colonIndex < 0) { continue; }
+
+                final int portBeginIndex = (colonIndex + 1);
+                if (portBeginIndex >= address.length()) { continue; }
+
+                port = Util.parseInt(address.substring(portBeginIndex));
+            }
+
+            final String endpointUri = (baseEndpointUri + port);
+            zmqEndpoints.put(notificationType, endpointUri);
+        }
+
+        return zmqEndpoints;
     }
 
     @Override

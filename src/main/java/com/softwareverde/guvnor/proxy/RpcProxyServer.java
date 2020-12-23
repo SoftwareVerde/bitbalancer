@@ -7,15 +7,10 @@ import com.softwareverde.cryptography.hash.sha256.Sha256Hash;
 import com.softwareverde.guvnor.proxy.rpc.ChainHeight;
 import com.softwareverde.guvnor.proxy.rpc.RpcConfiguration;
 import com.softwareverde.guvnor.proxy.rpc.connector.BitcoinRpcConnector;
-import com.softwareverde.guvnor.proxy.rpc.connector.MutableRequest;
-import com.softwareverde.http.HttpMethod;
 import com.softwareverde.http.server.HttpServer;
 import com.softwareverde.http.server.endpoint.Endpoint;
-import com.softwareverde.http.server.servlet.response.Response;
-import com.softwareverde.json.Json;
 import com.softwareverde.logging.Logger;
 import com.softwareverde.util.HexUtil;
-import com.softwareverde.util.StringUtil;
 import com.softwareverde.util.Util;
 
 import java.util.HashMap;
@@ -35,81 +30,6 @@ public class RpcProxyServer {
     protected final ConcurrentHashMap<RpcConfiguration, List<ZmqNotificationThread>> _zmqNotificationThreads = new ConcurrentHashMap<>();
 
     protected final SleepyService _chainWorkMonitor;
-
-    protected Map<NotificationType, String> _getZmqEndpoints(final RpcConfiguration rpcConfiguration) {
-        final BitcoinRpcConnector bitcoinRpcConnector = rpcConfiguration.getBitcoinRpcConnector();
-        final String baseEndpointUri = ("tcp://" + bitcoinRpcConnector.getHost() + ":");
-
-        if (rpcConfiguration.hasZmqPorts()) {
-            final HashMap<NotificationType, String> zmqEndpoints = new HashMap<>();
-            for (final NotificationType notificationType : NotificationType.values()) {
-                final Integer zmqPort = rpcConfiguration.getZmqPort(notificationType);
-                if (zmqPort == null) { continue; }
-
-                final String endpointUri = (baseEndpointUri + zmqPort);
-                zmqEndpoints.put(notificationType, endpointUri);
-            }
-            return zmqEndpoints;
-        }
-
-        final byte[] requestPayload;
-        { // Build request payload
-            final Json json = new Json(false);
-            json.put("id", NEXT_REQUEST_ID.getAndIncrement());
-            json.put("method", "getzmqnotifications");
-
-            { // Method Parameters
-                final Json paramsJson = new Json(true);
-                json.put("params", paramsJson);
-            }
-
-            requestPayload = StringUtil.stringToBytes(json.toString());
-        }
-
-        Logger.trace("Attempting to collect ZMQ configuration for node: " + rpcConfiguration);
-
-        final MutableRequest request = new MutableRequest();
-        request.setMethod(HttpMethod.POST);
-        request.setRawPostData(requestPayload);
-
-        final HashMap<NotificationType, String> zmqEndpoints = new HashMap<>();
-        final Json resultJson;
-        {
-            final Response response = bitcoinRpcConnector.handleRequest(request);
-            final Json responseJson = Json.parse(StringUtil.bytesToString(response.getContent()));
-
-            final String errorString = responseJson.getString("error");
-            if (! Util.isBlank(errorString)) {
-                Logger.debug("Received error from " + rpcConfiguration + ": " + errorString);
-                return zmqEndpoints;
-            }
-
-            resultJson = responseJson.get("result");
-        }
-
-        for (int i = 0; i < resultJson.length(); ++i) {
-            final Json configJson = resultJson.get(i);
-            final String messageTypeString = configJson.getString("type");
-            final NotificationType notificationType = ZmqMessageTypeConverter.fromPublishString(messageTypeString);
-            final String address = configJson.getString("address");
-
-            final Integer port;
-            {
-                final int colonIndex = address.lastIndexOf(':');
-                if (colonIndex < 0) { continue; }
-
-                final int portBeginIndex = (colonIndex + 1);
-                if (portBeginIndex >= address.length()) { continue; }
-
-                port = Util.parseInt(address.substring(portBeginIndex));
-            }
-
-            final String endpointUri = (baseEndpointUri + port);
-            zmqEndpoints.put(notificationType, endpointUri);
-        }
-
-        return zmqEndpoints;
-    }
 
     protected RpcConfiguration _selectBestRpcConfiguration() {
         return _selectBestRpcConfiguration(null);
@@ -239,6 +159,24 @@ public class RpcProxyServer {
         for (final ZmqNotificationThread notificationThread : zmqNotificationThreads) {
             notificationThread.start();
         }
+    }
+
+    protected Map<NotificationType, String> _getZmqEndpoints(final RpcConfiguration rpcConfiguration) {
+        if (rpcConfiguration.hasZmqPorts()) {
+            final String baseEndpointUri = ("tcp://" + rpcConfiguration.getHost() + ":");
+            final HashMap<NotificationType, String> zmqEndpoints = new HashMap<>();
+            for (final NotificationType notificationType : NotificationType.values()) {
+                final Integer zmqPort = rpcConfiguration.getZmqPort(notificationType);
+                if (zmqPort == null) { continue; }
+
+                final String endpointUri = (baseEndpointUri + zmqPort);
+                zmqEndpoints.put(notificationType, endpointUri);
+            }
+            return zmqEndpoints;
+        }
+
+        final BitcoinRpcConnector bitcoinRpcConnector = rpcConfiguration.getBitcoinRpcConnector();
+        return bitcoinRpcConnector.getZmqEndpoints();
     }
 
     public RpcProxyServer(final Integer port, final List<RpcConfiguration> rpcConfigurations, final ZmqConfiguration zmqConfiguration) {

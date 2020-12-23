@@ -101,9 +101,9 @@ public class RpcProxyHandler implements Servlet {
             batchRunner.run(rpcConfigurations, new BatchRunner.Batch<RpcConfiguration>() {
                 @Override
                 public void run(final List<RpcConfiguration> rpcConfigurations) {
-                    final NanoTimer nanoTimer = new NanoTimer();
-
                     final RpcConfiguration rpcConfiguration = rpcConfigurations.get(0); // Workaround for non-specialization of BatchRunner of size 1.
+
+                    final NanoTimer nanoTimer = new NanoTimer();
                     final BitcoinRpcConnector bitcoinRpcConnector = rpcConfiguration.getBitcoinRpcConnector();
 
                     nanoTimer.start();
@@ -111,7 +111,8 @@ public class RpcProxyHandler implements Servlet {
                     nanoTimer.stop();
 
                     final Block blockTemplate;
-                    final Json responseJson = Json.parse(StringUtil.bytesToString(response.getContent()));
+                    final String rawResponse = StringUtil.bytesToString(response.getContent());
+                    final Json responseJson = (Json.isJson(rawResponse) ? Json.parse(rawResponse) : new Json());
                     final String errorString = responseJson.getString("error");
                     if (! Util.isBlank(errorString)) {
                         Logger.debug("Received error from " + rpcConfiguration + ": " + errorString);
@@ -119,7 +120,14 @@ public class RpcProxyHandler implements Servlet {
                     }
                     else {
                         final Json resultJson = responseJson.get("result");
-                        blockTemplate = _assembleBlockTemplate(resultJson);
+                        Block assembledBlock = null;
+                        try {
+                            assembledBlock = _assembleBlockTemplate(resultJson);
+                        }
+                        catch (final Exception exception) {
+                            Logger.debug("Unable to obtain template from " + rpcConfiguration + ".", exception);
+                        }
+                        blockTemplate = assembledBlock;
                     }
 
                     blockTemplateResponses.put(rpcConfiguration, response);
@@ -221,6 +229,9 @@ public class RpcProxyHandler implements Servlet {
             final Boolean isValid = bitcoinRpcConnector.validateBlockTemplate(blockTemplate);
             if (isValid) {
                 validCount += 1;
+            }
+            else {
+                Logger.debug("Template considered invalid by: " + rpcConfiguration);
             }
         }
 
