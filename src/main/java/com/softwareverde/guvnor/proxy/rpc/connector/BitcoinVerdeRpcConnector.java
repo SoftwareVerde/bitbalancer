@@ -3,9 +3,9 @@ package com.softwareverde.guvnor.proxy.rpc.connector;
 import com.softwareverde.bitcoin.block.Block;
 import com.softwareverde.bitcoin.block.BlockInflater;
 import com.softwareverde.bitcoin.block.header.difficulty.work.ChainWork;
+import com.softwareverde.bitcoin.block.validator.BlockValidator;
 import com.softwareverde.bitcoin.server.module.node.rpc.NodeJsonRpcConnection;
 import com.softwareverde.bitcoin.transaction.Transaction;
-import com.softwareverde.bitcoin.transaction.TransactionDeflater;
 import com.softwareverde.bitcoin.util.StringUtil;
 import com.softwareverde.concurrent.pool.MainThreadPool;
 import com.softwareverde.concurrent.pool.ThreadPool;
@@ -23,44 +23,12 @@ import com.softwareverde.json.Json;
 import com.softwareverde.logging.Logger;
 import com.softwareverde.network.socket.JsonSocket;
 import com.softwareverde.util.Util;
+import com.softwareverde.util.type.time.SystemTime;
 
 public class BitcoinVerdeRpcConnector implements BitcoinRpcConnector {
     public static final String IDENTIFIER = "VERDE";
 
-    protected static String blockToBlockTemplateJson(final Long blockHeight, final Block block) {
-        final TransactionDeflater transactionDeflater = new TransactionDeflater();
-
-        final Json transactionsJson = new Json(true);
-        Transaction coinbaseTransaction = null;
-        for (final Transaction transaction : block.getTransactions()) {
-            if (coinbaseTransaction == null) { // bitcoin-cli getblocktemplate does not return a coinbase.
-                coinbaseTransaction = transaction;
-                continue;
-            }
-
-            final Json transactionJson = new Json();
-
-            final ByteArray transactionData = transactionDeflater.toBytes(transaction);
-            transactionJson.put("data", transactionData.toString().toLowerCase());
-
-            transactionsJson.add(transactionJson);
-        }
-
-        final Json resultJson = new Json(false);
-        resultJson.put("version", block.getVersion());
-        resultJson.put("bits", block.getDifficulty().encode().toString().toLowerCase());
-        resultJson.put("previousblockhash", block.getPreviousBlockHash().toString().toLowerCase());
-        resultJson.put("mintime", block.getTimestamp());
-        resultJson.put("coinbasevalue", block.getCoinbaseTransaction().getTotalOutputValue());
-        resultJson.put("height", blockHeight);
-        resultJson.put("transactions", transactionsJson);
-
-        final Json json = new Json(false);
-        json.put("error", null);
-        json.put("result", resultJson);
-        return json.toString();
-    }
-
+    protected final SystemTime _systemTime;
     protected final ThreadPool _threadPool;
     protected final BitcoinNodeAddress _bitcoinNodeAddress;
     protected final RpcCredentials _rpcCredentials;
@@ -72,6 +40,7 @@ public class BitcoinVerdeRpcConnector implements BitcoinRpcConnector {
     }
 
     public BitcoinVerdeRpcConnector(final BitcoinNodeAddress bitcoinNodeAddress, final RpcCredentials rpcCredentials) {
+        _systemTime = new SystemTime();
         _bitcoinNodeAddress = bitcoinNodeAddress;
         _rpcCredentials = rpcCredentials;
 
@@ -100,64 +69,6 @@ public class BitcoinVerdeRpcConnector implements BitcoinRpcConnector {
         final Integer port = _bitcoinNodeAddress.getPort();
         try (final NodeJsonRpcConnection nodeJsonRpcConnection = new NodeJsonRpcConnection(host, port, _threadPool)) {
             switch (query) {
-                case "getblocktemplate": {
-                    final Json prototypeBlockJson = nodeJsonRpcConnection.getPrototypeBlock(true);
-                    final BlockInflater blockInflater = new BlockInflater();
-                    final Block block = blockInflater.fromBytes(ByteArray.fromHexString(prototypeBlockJson.getString("block")));
-                    if (block == null) {
-                        final Response response = new Response();
-                        response.setCode(Response.Codes.SERVER_ERROR);
-                        response.setContent("Error retrieving prototype block.");
-                        return response;
-                    }
-
-                    final long blockHeight;
-                    try (final NodeJsonRpcConnection blockHeightNodeJsonRpcConnection = new NodeJsonRpcConnection(host, port, _threadPool)) {
-                        final Json responseJson = blockHeightNodeJsonRpcConnection.getBlockHeight();
-                        blockHeight = (responseJson.getLong("blockHeight") + 1L);
-                    }
-
-                    final Response response = new Response();
-                    response.setCode(Response.Codes.OK);
-                    response.setContent(BitcoinVerdeRpcConnector.blockToBlockTemplateJson(blockHeight, block));
-                    return response;
-                }
-
-                case "validateblocktemplate": {
-                    final Json paramsJson = requestJson.get("params");
-                    final String blockData = paramsJson.getString(0);
-                    final BlockInflater blockInflater = new BlockInflater();
-                    final Block block = blockInflater.fromBytes(ByteArray.fromHexString(blockData));
-                    if (block == null) {
-                        final Response response = new Response();
-                        response.setCode(Response.Codes.BAD_REQUEST);
-                        response.setContent("Unable to parse block data.");
-                        return response;
-                    }
-
-                    final Json responseJson = nodeJsonRpcConnection.validatePrototypeBlock(block);
-                    final Json validationResult = responseJson.get("blockValidation");
-                    final Boolean isValid = validationResult.getBoolean("isValid");
-
-                    /*
-                        Example Invalid response:
-                            error code: -1
-                            error message:
-                            invalid block: bad-txn-order
-                     */
-                    if (! isValid) {
-                        final Response response = new Response();
-                        response.setCode(Response.Codes.BAD_REQUEST);
-                        response.setContent("Invalid block.");
-                        return response;
-                    }
-
-                    final Response response = new Response();
-                    response.setCode(Response.Codes.OK);
-                    response.setContent(".");
-                    return response;
-                }
-
                 default: {
                     Logger.debug("Unsupported command: " + query);
                     final Response response = new Response();
@@ -192,16 +103,90 @@ public class BitcoinVerdeRpcConnector implements BitcoinRpcConnector {
     }
 
     @Override
-    public Boolean validateBlockTemplate(final Block blockTemplate) {
+    public BlockTemplate getBlockTemplate() {
         final String host = _bitcoinNodeAddress.getHost();
         final Integer port = _bitcoinNodeAddress.getPort();
 
-        // TODO: What about mempool synchronization?
+        final Json prototypeBlockJson;
         try (final NodeJsonRpcConnection nodeJsonRpcConnection = new NodeJsonRpcConnection(host, port, _threadPool)) {
-            final Json responseJson = nodeJsonRpcConnection.validatePrototypeBlock(blockTemplate);
-            final Json validationResult = responseJson.get("blockValidation");
-            return validationResult.getBoolean("isValid");
+            prototypeBlockJson = nodeJsonRpcConnection.getPrototypeBlock(true);
         }
+
+        final BlockInflater blockInflater = new BlockInflater();
+        final Block block = blockInflater.fromBytes(ByteArray.fromHexString(prototypeBlockJson.getString("block")));
+        if (block == null) {
+            Logger.warn("Error retrieving prototype block.");
+            return null;
+        }
+
+        final long blockHeight;
+        try (final NodeJsonRpcConnection blockHeightNodeJsonRpcConnection = new NodeJsonRpcConnection(host, port, _threadPool)) {
+            final Json responseJson = blockHeightNodeJsonRpcConnection.getBlockHeight();
+            blockHeight = (responseJson.getLong("blockHeight") + 1L);
+        }
+
+        final BlockTemplate blockTemplate = new BlockTemplate();
+
+        blockTemplate.setBlockVersion(block.getVersion());
+        blockTemplate.setDifficulty(block.getDifficulty());
+        blockTemplate.setPreviousBlockHash(block.getPreviousBlockHash());
+        blockTemplate.setMinimumBlockTime(block.getTimestamp());
+        blockTemplate.setNonceRange(BlockTemplate.DEFAULT_NONCE_RANGE);
+
+        blockTemplate.setBlockHeight(blockHeight);
+
+        Transaction coinbaseTransaction = null;
+        for (final Transaction transaction : block.getTransactions()) {
+            if (coinbaseTransaction == null) {
+                coinbaseTransaction = transaction;
+                continue;
+            }
+
+            final Long fee = 0L; // Unsupported.
+            final Integer signatureOperationCount = 0; // Unsupported.
+            blockTemplate.addTransaction(transaction, fee, signatureOperationCount);
+        }
+
+        if (coinbaseTransaction != null) {
+            blockTemplate.setCoinbaseAmount(coinbaseTransaction.getTotalOutputValue());
+        }
+
+        final long maxBlockByteCount = BlockInflater.MAX_BYTE_COUNT;
+        final long maximumSignatureOperationCount = (maxBlockByteCount / BlockValidator.MIN_BYTES_PER_SIGNATURE_OPERATION);
+
+        final Long now = _systemTime.getCurrentTimeInSeconds();
+        blockTemplate.setCurrentTime(now);
+        blockTemplate.setMaxSignatureOperationCount(maximumSignatureOperationCount);
+        blockTemplate.setMaxBlockByteCount(maxBlockByteCount);
+
+        blockTemplate.setTarget(block.getDifficulty().getBytes());
+
+        final String longPollId = (block.getPreviousBlockHash() + "" + now).toLowerCase();
+        blockTemplate.setLongPollId(longPollId);
+
+        blockTemplate.setCoinbaseAuxFlags("");
+        blockTemplate.addCapability("proposal");
+        blockTemplate.addMutableField("time");
+        blockTemplate.addMutableField("transactions");
+        blockTemplate.addMutableField("prevblock");
+
+        return blockTemplate;
+    }
+
+    @Override
+    public Boolean validateBlockTemplate(final BlockTemplate blockTemplate) {
+        final String host = _bitcoinNodeAddress.getHost();
+        final Integer port = _bitcoinNodeAddress.getPort();
+
+        final Block block = blockTemplate.toBlock();
+
+        final Json responseJson;
+        try (final NodeJsonRpcConnection nodeJsonRpcConnection = new NodeJsonRpcConnection(host, port, _threadPool)) {
+            responseJson = nodeJsonRpcConnection.validatePrototypeBlock(block);
+        }
+
+        final Json validationResult = responseJson.get("blockValidation");
+        return validationResult.getBoolean("isValid");
     }
 
     @Override

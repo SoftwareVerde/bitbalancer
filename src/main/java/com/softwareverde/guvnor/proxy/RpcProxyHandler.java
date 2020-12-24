@@ -1,22 +1,13 @@
 package com.softwareverde.guvnor.proxy;
 
-import com.softwareverde.bitcoin.address.Address;
-import com.softwareverde.bitcoin.address.AddressInflater;
-import com.softwareverde.bitcoin.block.Block;
-import com.softwareverde.bitcoin.block.MutableBlock;
-import com.softwareverde.bitcoin.block.header.difficulty.Difficulty;
 import com.softwareverde.bitcoin.server.database.BatchRunner;
-import com.softwareverde.bitcoin.transaction.Transaction;
-import com.softwareverde.bitcoin.transaction.TransactionInflater;
 import com.softwareverde.bitcoin.util.Util;
-import com.softwareverde.constable.bytearray.ByteArray;
 import com.softwareverde.constable.bytearray.MutableByteArray;
 import com.softwareverde.constable.list.List;
 import com.softwareverde.constable.list.mutable.MutableList;
-import com.softwareverde.cryptography.hash.sha256.Sha256Hash;
-import com.softwareverde.cryptography.secp256k1.key.PrivateKey;
 import com.softwareverde.guvnor.proxy.rpc.RpcConfiguration;
 import com.softwareverde.guvnor.proxy.rpc.connector.BitcoinRpcConnector;
+import com.softwareverde.guvnor.proxy.rpc.connector.BlockTemplate;
 import com.softwareverde.http.server.servlet.Servlet;
 import com.softwareverde.http.server.servlet.request.Request;
 import com.softwareverde.http.server.servlet.response.Response;
@@ -56,46 +47,12 @@ public class RpcProxyHandler implements Servlet {
 
     protected final NodeSelector _nodeSelector;
 
-    protected Block _assembleBlockTemplate(final Json blockTemplateJson) {
-        final AddressInflater addressInflater = new AddressInflater();
-        final TransactionInflater transactionInflater = new TransactionInflater();
-
-        final MutableBlock block = new MutableBlock();
-        block.setVersion(blockTemplateJson.getLong("version"));
-        block.setDifficulty(Difficulty.decode(ByteArray.fromHexString(blockTemplateJson.getString("bits"))));
-        block.setPreviousBlockHash(Sha256Hash.fromHexString(blockTemplateJson.getString("previousblockhash")));
-        block.setTimestamp(blockTemplateJson.getLong("mintime"));
-        block.setNonce(0L);
-
-        final Transaction coinbaseTransaction;
-        { // Generate the Coinbase
-            final Long coinbaseAmount = blockTemplateJson.getLong("coinbasevalue");
-            final Long blockHeight = blockTemplateJson.getLong("height");
-
-            final String coinbaseMessage = "0000000000000000000000000000000000000000000000000000000000000000"; // NOTE: CoinbaseMessage must be at least 11 bytes or the transaction will not satisfy the minimum transaction size (100 bytes).
-            final PrivateKey privateKey = PrivateKey.fromHexString("0000000000000000000000000000000000000000000000000000000000000001");
-            final Address address = addressInflater.fromPrivateKey(privateKey);
-            coinbaseTransaction = transactionInflater.createCoinbaseTransaction(blockHeight, coinbaseMessage, address, coinbaseAmount);
-        }
-        block.addTransaction(coinbaseTransaction);
-
-        final Json transactionsJson = blockTemplateJson.get("transactions");
-        for (int i = 0; i < transactionsJson.length(); ++i) {
-            final Json transactionJson = transactionsJson.get(i);
-            final Transaction transaction = transactionInflater.fromBytes(ByteArray.fromHexString(transactionJson.getString("data")));
-            block.addTransaction(transaction);
-        }
-
-        return block;
-    }
-
-    protected Response _onGetBlockTemplateFailure(final Request request) {
+    protected Response _onGetBlockTemplateFailure(final Long requestId) {
         boolean wasSuccessful = true;
         int bestValidCount = 0;
         RpcConfiguration bestRpcConfiguration = null;
 
-        final ConcurrentHashMap<RpcConfiguration, Response> blockTemplateResponses = new ConcurrentHashMap<>();
-        final ConcurrentHashMap<RpcConfiguration, Block> blockTemplates = new ConcurrentHashMap<>();
+        final ConcurrentHashMap<RpcConfiguration, BlockTemplate> blockTemplates = new ConcurrentHashMap<>();
         final ConcurrentHashMap<RpcConfiguration, AtomicInteger> countOfValidBlockTemplates = new ConcurrentHashMap<>();
 
         final List<RpcConfiguration> rpcConfigurations = _nodeSelector.getNodes();
@@ -111,41 +68,26 @@ public class RpcProxyHandler implements Servlet {
                     final BitcoinRpcConnector bitcoinRpcConnector = rpcConfiguration.getBitcoinRpcConnector();
 
                     nanoTimer.start();
-                    final Response response = bitcoinRpcConnector.handleRequest(request);
+                    final BlockTemplate blockTemplate = bitcoinRpcConnector.getBlockTemplate();
                     nanoTimer.stop();
 
-                    final Block blockTemplate;
-                    final String rawResponse = StringUtil.bytesToString(response.getContent());
-                    final Json responseJson = (Json.isJson(rawResponse) ? Json.parse(rawResponse) : new Json());
-                    final String errorString = responseJson.getString("error");
-                    if (! Util.isBlank(errorString)) {
-                        Logger.debug("Received error from " + rpcConfiguration + ": " + errorString);
-                        blockTemplate = null;
-                    }
-                    else {
-                        final Json resultJson = responseJson.get("result");
-                        Block assembledBlock = null;
-                        try {
-                            assembledBlock = _assembleBlockTemplate(resultJson);
-                        }
-                        catch (final Exception exception) {
-                            Logger.debug("Unable to obtain template from " + rpcConfiguration + ".", exception);
-                        }
-                        blockTemplate = assembledBlock;
-                    }
-
-                    blockTemplateResponses.put(rpcConfiguration, response);
                     if (blockTemplate != null) {
                         blockTemplates.put(rpcConfiguration, blockTemplate);
                     }
+
                     countOfValidBlockTemplates.put(rpcConfiguration, new AtomicInteger(0));
 
-                    Logger.debug("Obtained template from " + rpcConfiguration + " in " + nanoTimer.getMillisecondsElapsed() + "ms.");
+                    if (blockTemplate == null) {
+                        Logger.debug("Failed to obtain template from " + rpcConfiguration + " in " + nanoTimer.getMillisecondsElapsed() + "ms.");
+                    }
+                    else {
+                        Logger.debug("Obtained template from " + rpcConfiguration + " in " + nanoTimer.getMillisecondsElapsed() + "ms.");
+                    }
                 }
             });
 
             for (final RpcConfiguration rpcConfigurationForTemplate : rpcConfigurations) {
-                final Block blockTemplate = blockTemplates.get(rpcConfigurationForTemplate);
+                final BlockTemplate blockTemplate = blockTemplates.get(rpcConfigurationForTemplate);
                 if (blockTemplate == null) { continue; }
 
                 batchRunner.run(rpcConfigurations, new BatchRunner.Batch<RpcConfiguration>() {
@@ -195,44 +137,43 @@ public class RpcProxyHandler implements Servlet {
         if (! wasSuccessful) {
             Logger.warn("No valid templates found.");
 
-            final Json errorJson = new Json();
-            errorJson.put("error", "No valid templates found.");
-            errorJson.put("code", Integer.MIN_VALUE);
+            final Json responseJson = new Json();
+            responseJson.put("id", requestId);
+            responseJson.put("code", Integer.MIN_VALUE);
+            responseJson.put("error", "No valid templates found.");
+            responseJson.put("result", null);
 
             final Response response = new Response();
             response.setCode(Response.Codes.SERVER_ERROR);
-            response.setContent(errorJson.toString());
+            response.setContent(responseJson.toString());
             return response;
         }
 
+        final BlockTemplate blockTemplate = blockTemplates.get(bestRpcConfiguration);
         Logger.info("Block template from " + bestRpcConfiguration + " considered valid by " + bestValidCount + " nodes.");
-        return blockTemplateResponses.get(bestRpcConfiguration);
+
+        final Json responseJson = new Json();
+        responseJson.put("id", requestId);
+        responseJson.put("error", null);
+        responseJson.put("result", blockTemplate);
+
+        final Response response = new Response();
+        response.setCode(Response.Codes.OK);
+        response.setContent(responseJson.toString());
+        return response;
     }
 
-    protected Response _onGetBlockTemplateRequest(final RpcConfiguration bestRpcConfiguration, final Request request) {
+    protected Response _onGetBlockTemplateRequest(final Long requestId, final RpcConfiguration bestRpcConfiguration) {
         final List<RpcConfiguration> rpcConfigurations = _nodeSelector.getNodes();
         final BitcoinRpcConnector bestBitcoinRpcConnector = bestRpcConfiguration.getBitcoinRpcConnector();
-        final Response response = bestBitcoinRpcConnector.handleRequest(request);
 
-        final String rawResponse = StringUtil.bytesToString(response.getContent());
-        final Json responseJson = (Json.isJson(rawResponse) ? Json.parse(rawResponse) : new Json());
+        final BlockTemplate blockTemplate = bestBitcoinRpcConnector.getBlockTemplate();
 
         final int nodeCount = rpcConfigurations.getCount();
-
         final Container<String> errorStringContainer = new Container<>();
-        final Boolean isSuccessfulResponse = _isSuccessfulResponse(response, responseJson, errorStringContainer);
-        if (! isSuccessfulResponse) {
-            Logger.debug("Received error from " + bestRpcConfiguration + ": " + errorStringContainer.value);
-            return response;
-        }
-
-        final Json resultJson = responseJson.get("result");
-        final Block blockTemplate = _assembleBlockTemplate(resultJson);
         if (blockTemplate == null) {
-            Logger.warn("Unable to assemble block template.");
-            Logger.debug(responseJson);
-
-            return _onGetBlockTemplateFailure(request);
+            Logger.warn("Unable to get block template from " + bestRpcConfiguration + ": " + errorStringContainer.value);
+            return _onGetBlockTemplateFailure(requestId);
         }
 
         final AtomicInteger validCount = new AtomicInteger(0);
@@ -270,45 +211,24 @@ public class RpcProxyHandler implements Servlet {
             Logger.warn(exception);
         }
 
-        final Sha256Hash previousBlockHash = blockTemplate.getPreviousBlockHash();
+        final Long blockHeight = blockTemplate.getBlockHeight();
         final int invalidCount = (nodeCount - validCount.get());
         if (invalidCount > 0) {
-            Logger.warn("Block template considered invalid by " + invalidCount + " nodes.");
-            return _onGetBlockTemplateFailure(request);
+            Logger.warn("Block template for height " + blockHeight + " considered invalid by " + invalidCount + " nodes.");
+            return _onGetBlockTemplateFailure(requestId);
         }
 
-        Logger.info("Block template for previous block " + previousBlockHash + " considered valid by all nodes.");
+        Logger.info("Block template for height " + blockHeight + " considered valid by all nodes.");
+
+        final Json responseJson = new Json();
+        responseJson.put("id", requestId);
+        responseJson.put("error", null);
+        responseJson.put("result", blockTemplate);
+
+        final Response response = new Response();
+        response.setCode(Response.Codes.OK);
+        response.setContent(responseJson.toString());
         return response;
-    }
-
-    protected Boolean _isSuccessfulResponse(final Response response, final Json preParsedResponse) {
-        return _isSuccessfulResponse(response, preParsedResponse, new Container<String>());
-    }
-
-    protected Boolean _isSuccessfulResponse(final Response response, final Json preParsedResponse, final Container<String> errorStringContainer) {
-        errorStringContainer.value = null;
-        if (response == null) { return false; }
-
-        if (! Util.areEqual(Response.Codes.OK, response.getCode())) {
-            return false;
-        }
-
-        final Json responseJson;
-        if (preParsedResponse != null) {
-            responseJson = preParsedResponse;
-        }
-        else {
-            final String rawResponse = StringUtil.bytesToString(response.getContent());
-            responseJson = (Json.isJson(rawResponse) ? Json.parse(rawResponse) : new Json());
-        }
-
-        final String errorString = responseJson.getString("error");
-        if (! Util.isBlank(errorString)) {
-            errorStringContainer.value = errorString;
-            return false;
-        }
-
-        return true;
     }
 
     public RpcProxyHandler(final NodeSelector nodeSelector) {
@@ -317,11 +237,13 @@ public class RpcProxyHandler implements Servlet {
 
     @Override
     public Response onRequest(final Request request) {
+        final Long requestId;
         final String rawMethod;
         final Method method;
         { // Parse the method from the request object...
             final MutableByteArray rawPostData = MutableByteArray.wrap(request.getRawPostData());
             final Json requestJson = Json.parse(StringUtil.bytesToString(rawPostData.unwrap()));
+            requestId = requestJson.getLong("id");
             rawMethod = requestJson.getString("method");
             method = Method.fromString(rawMethod);
         }
@@ -330,7 +252,7 @@ public class RpcProxyHandler implements Servlet {
 
         if (method == Method.GET_BLOCK_TEMPLATE) {
             final RpcConfiguration rpcConfiguration = _nodeSelector.selectBestNode();
-            return _onGetBlockTemplateRequest(rpcConfiguration, request);
+            return _onGetBlockTemplateRequest(requestId, rpcConfiguration);
         }
 
         final MutableList<RpcConfiguration> attemptedConfigurations = new MutableList<>();
@@ -352,7 +274,7 @@ public class RpcProxyHandler implements Servlet {
             nanoTimer.stop();
 
             final Container<String> errorStringContainer = new Container<>();
-            final Boolean responseWasSuccessful = _isSuccessfulResponse(response, null, errorStringContainer);
+            final Boolean responseWasSuccessful = bitcoinRpcConnector.isSuccessfulResponse(response, null, errorStringContainer);
             Logger.debug("Response received for " + rawMethod + " from " + rpcConfiguration + " in " + nanoTimer.getMillisecondsElapsed() + "ms.");
 
             if (responseWasSuccessful) {

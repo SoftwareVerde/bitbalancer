@@ -2,9 +2,13 @@ package com.softwareverde.guvnor.proxy.rpc.connector;
 
 import com.softwareverde.bitcoin.block.Block;
 import com.softwareverde.bitcoin.block.BlockDeflater;
+import com.softwareverde.bitcoin.block.header.difficulty.Difficulty;
 import com.softwareverde.bitcoin.block.header.difficulty.work.ChainWork;
+import com.softwareverde.bitcoin.transaction.Transaction;
+import com.softwareverde.bitcoin.transaction.TransactionInflater;
 import com.softwareverde.constable.bytearray.ByteArray;
 import com.softwareverde.constable.bytearray.MutableByteArray;
+import com.softwareverde.cryptography.hash.sha256.Sha256Hash;
 import com.softwareverde.guvnor.BitcoinCoreUtil;
 import com.softwareverde.guvnor.BitcoinNodeAddress;
 import com.softwareverde.guvnor.proxy.NotificationType;
@@ -86,7 +90,7 @@ public class BitcoinCoreRpcConnector implements BitcoinRpcConnector {
         final Json resultJson;
         {
             final Response response = this.handleRequest(request);
-            final String rawResponse = StringUtil.bytesToString(response.getContent()).trim();
+            final String rawResponse = StringUtil.bytesToString(response.getContent());
             if (! Json.isJson(rawResponse)) {
                 Logger.debug("Received error from " + _toString() +": " + rawResponse.replaceAll("[\\n\\r]+", "/"));
                 return zmqEndpoints;
@@ -227,7 +231,7 @@ public class BitcoinCoreRpcConnector implements BitcoinRpcConnector {
         final Json resultJson;
         {
             final Response response = this.handleRequest(request);
-            final String rawResponse = StringUtil.bytesToString(response.getContent()).trim();
+            final String rawResponse = StringUtil.bytesToString(response.getContent());
             if (! Json.isJson(rawResponse)) {
                 Logger.debug("Received error from " + _toString() +": " + rawResponse.replaceAll("[\\n\\r]+", "/"));
                 return null;
@@ -250,7 +254,93 @@ public class BitcoinCoreRpcConnector implements BitcoinRpcConnector {
     }
 
     @Override
-    public Boolean validateBlockTemplate(final Block blockTemplate) {
+    public BlockTemplate getBlockTemplate() {
+        final byte[] requestPayload;
+        { // Build request payload
+            final Json json = new Json(false);
+            json.put("id", _nextRequestId.getAndIncrement());
+            json.put("method", "getblocktemplate");
+
+            { // Method Parameters
+                final Json paramsJson = new Json(true);
+                json.put("params", paramsJson);
+            }
+
+            requestPayload = StringUtil.stringToBytes(json.toString());
+        }
+
+        final MutableRequest request = new MutableRequest();
+        request.setMethod(HttpMethod.POST);
+        request.setRawPostData(requestPayload);
+
+        final Json blockTemplateJson;
+        {
+            final Response response = this.handleRequest(request);
+            final String rawResponse = StringUtil.bytesToString(response.getContent());
+            if (! Json.isJson(rawResponse)) {
+                Logger.debug("Received error from " + _toString() +": " + rawResponse.replaceAll("[\\n\\r]+", "/"));
+                return null;
+            }
+            final Json responseJson = Json.parse(rawResponse);
+
+            final String errorString = responseJson.getString("error");
+            if (! Util.isBlank(errorString)) {
+                Logger.debug("Received error from " + _toString() + ": " + errorString);
+                return null;
+            }
+
+            blockTemplateJson = responseJson.get("result");
+        }
+
+        final BlockTemplate blockTemplate = new BlockTemplate();
+        final TransactionInflater transactionInflater = new TransactionInflater();
+
+        blockTemplate.setBlockVersion(blockTemplateJson.getLong("version"));
+        blockTemplate.setDifficulty(Difficulty.decode(ByteArray.fromHexString(blockTemplateJson.getString("bits"))));
+        blockTemplate.setPreviousBlockHash(Sha256Hash.fromHexString(blockTemplateJson.getString("previousblockhash")));
+        blockTemplate.setMinimumBlockTime(blockTemplateJson.getLong("mintime"));
+        blockTemplate.setNonceRange(ByteArray.fromHexString(blockTemplateJson.getString("noncerange")));
+
+        blockTemplate.setCoinbaseAmount(blockTemplateJson.getLong("coinbasevalue"));
+        blockTemplate.setBlockHeight(blockTemplateJson.getLong("height"));
+
+        final Json transactionsJson = blockTemplateJson.get("transactions");
+        for (int i = 0; i < transactionsJson.length(); ++i) {
+            final Json transactionJson = transactionsJson.get(i);
+            final Transaction transaction = transactionInflater.fromBytes(ByteArray.fromHexString(transactionJson.getString("data")));
+            final Long fee = transactionJson.getLong("fee");
+            final Integer signatureOperationCount = transactionJson.getInteger("sigops");
+            blockTemplate.addTransaction(transaction, fee, signatureOperationCount);
+        }
+
+        blockTemplate.setCurrentTime(blockTemplateJson.getLong("curtime"));
+        blockTemplate.setMaxSignatureOperationCount(blockTemplateJson.getLong("sigoplimit"));
+        blockTemplate.setMaxBlockByteCount(blockTemplateJson.getLong("sizelimit"));
+
+        blockTemplate.setTarget(Sha256Hash.fromHexString(blockTemplateJson.getString("target")));
+        blockTemplate.setLongPollId(blockTemplateJson.getString("longpollid"));
+
+        final Json coinbaseAuxJson = blockTemplateJson.get("coinbaseaux");
+        final String coinbaseAuxFlags = coinbaseAuxJson.getString("flags");
+        blockTemplate.setCoinbaseAuxFlags(coinbaseAuxFlags);
+
+        final Json capabilitiesJson = blockTemplateJson.get("capabilities");
+        for (int i = 0; i < capabilitiesJson.length(); ++i) {
+            final String capability = coinbaseAuxJson.getString(i);
+            blockTemplate.addCapability(capability);
+        }
+
+        final Json mutableFieldsJson = blockTemplateJson.get("mutable");
+        for (int i = 0; i < mutableFieldsJson.length(); ++i) {
+            final String mutableField = mutableFieldsJson.getString(i);
+            blockTemplate.addMutableField(mutableField);
+        }
+
+        return blockTemplate;
+    }
+
+    @Override
+    public Boolean validateBlockTemplate(final BlockTemplate blockTemplate) {
         final byte[] requestPayload;
         { // Build request payload
             final Json json = new Json(false);
@@ -259,7 +349,8 @@ public class BitcoinCoreRpcConnector implements BitcoinRpcConnector {
 
             { // Method Parameters
                 final BlockDeflater blockDeflater = new BlockDeflater();
-                final ByteArray blockTemplateBytes = blockDeflater.toBytes(blockTemplate);
+                final Block block = blockTemplate.toBlock();
+                final ByteArray blockTemplateBytes = blockDeflater.toBytes(block);
 
                 final Json paramsJson = new Json(true);
                 paramsJson.add(blockTemplateBytes);
@@ -277,7 +368,7 @@ public class BitcoinCoreRpcConnector implements BitcoinRpcConnector {
         final Boolean returnValueOnError = false;
 
         final Response response = this.handleRequest(request);
-        final String rawResponse = StringUtil.bytesToString(response.getContent()).trim();
+        final String rawResponse = StringUtil.bytesToString(response.getContent());
         if (! Json.isJson(rawResponse)) {
             Logger.debug("Received error from " + _toString() +": " + rawResponse.replaceAll("[\\n\\r]+", "/"));
             return returnValueOnError;

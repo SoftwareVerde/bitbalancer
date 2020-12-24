@@ -1,6 +1,5 @@
 package com.softwareverde.guvnor.proxy.rpc.connector;
 
-import com.softwareverde.bitcoin.block.Block;
 import com.softwareverde.guvnor.BitcoinNodeAddress;
 import com.softwareverde.guvnor.proxy.rpc.RpcCredentials;
 
@@ -12,7 +11,7 @@ public class NoValidationBitcoinCoreRpcConnector extends BitcoinCoreRpcConnector
     }
 
     @Override
-    public Boolean validateBlockTemplate(final Block blockTemplate) {
+    public Boolean validateBlockTemplate(final BlockTemplate blockTemplate) {
         return null;
     }
 }
