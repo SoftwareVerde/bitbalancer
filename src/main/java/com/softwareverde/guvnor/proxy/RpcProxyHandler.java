@@ -30,14 +30,16 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class RpcProxyHandler implements Servlet {
     public enum Method {
-        GET_BLOCK_TEMPLATE("getblocktemplate");
+        GET_BLOCK_TEMPLATE("getblocktemplate"),
+        GET_BLOCK_TEMPLATE_LIGHT("getblocktemplatelight");
 
         protected final String _value;
-        public String getValue() { return _value; }
 
         Method(final String value) {
             _value = value;
         }
+
+        public String getValue() { return _value; }
 
         public static Method fromString(final String value) {
             for (final Method method : Method.values()) {
@@ -275,6 +277,19 @@ public class RpcProxyHandler implements Servlet {
         return response;
     }
 
+    protected Boolean _isSuccessfulResponse(final Response response) {
+        if (response == null) { return false; }
+
+        if (! Util.areEqual(Response.Codes.OK, response.getCode())) {
+            return false;
+        }
+
+        final String rawResponse = StringUtil.bytesToString(response.getContent());
+        final Json responseJson = (Json.isJson(rawResponse) ? Json.parse(rawResponse) : new Json());
+        final String errorString = responseJson.getString("error");
+        return Util.isBlank(errorString);
+    }
+
     public RpcProxyHandler(final NodeSelector nodeSelector) {
         _nodeSelector = nodeSelector;
     }
@@ -290,6 +305,8 @@ public class RpcProxyHandler implements Servlet {
             method = Method.fromString(rawMethod);
         }
 
+        Logger.debug("Routing: " + rawMethod);
+
         if (method == Method.GET_BLOCK_TEMPLATE) {
             final RpcConfiguration rpcConfiguration = _nodeSelector.selectBestNode();
             return _onGetBlockTemplateRequest(rpcConfiguration, request);
@@ -298,6 +315,8 @@ public class RpcProxyHandler implements Servlet {
         final MutableList<RpcConfiguration> attemptedConfigurations = new MutableList<>();
         Response defaultResponse = null;
         while (true) {
+            final NanoTimer nanoTimer = new NanoTimer();
+
             final RpcConfiguration rpcConfiguration = _nodeSelector.selectBestNode(attemptedConfigurations);
             if (rpcConfiguration == null) { break; } // Break if no viable nodes remain...
 
@@ -305,10 +324,16 @@ public class RpcProxyHandler implements Servlet {
             attemptedConfigurations.add(rpcConfiguration);
 
             final BitcoinRpcConnector bitcoinRpcConnector = rpcConfiguration.getBitcoinRpcConnector();
-            final Response response = bitcoinRpcConnector.handleRequest(request);
-            if (response == null) { continue; }
+            Logger.debug("Routing: " + rawMethod + " to " + rpcConfiguration + ".");
 
-            if (Util.areEqual(Response.Codes.OK, response.getCode())) {
+            nanoTimer.start();
+            final Response response = bitcoinRpcConnector.handleRequest(request);
+            nanoTimer.stop();
+
+            final Boolean responseWasSuccessful = _isSuccessfulResponse(response);
+            Logger.debug("Response received for " + rawMethod + " from " + rpcConfiguration + " in " + nanoTimer.getMillisecondsElapsed() + "ms.");
+
+            if (responseWasSuccessful) {
                 return response;
             }
 
