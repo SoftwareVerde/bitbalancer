@@ -38,6 +38,8 @@ public class Main {
     protected Main(final String[] arguments) {
         Logger.setLog(LineNumberAnnotatedLog.getInstance());
         Logger.setLogLevel(LogLevel.DEBUG);
+        Logger.setLogLevel("com.softwareverde.network", LogLevel.WARN);
+        Logger.setLogLevel("com.softwareverde.util", LogLevel.WARN);
 
         if (arguments.length != 1) {
             System.err.println("Missing Argument: <configuration>");

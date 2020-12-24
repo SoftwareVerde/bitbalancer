@@ -12,6 +12,7 @@ import com.softwareverde.bitcoin.util.Util;
 import com.softwareverde.constable.bytearray.ByteArray;
 import com.softwareverde.constable.bytearray.MutableByteArray;
 import com.softwareverde.constable.list.List;
+import com.softwareverde.constable.list.mutable.MutableList;
 import com.softwareverde.cryptography.hash.sha256.Sha256Hash;
 import com.softwareverde.cryptography.secp256k1.key.PrivateKey;
 import com.softwareverde.guvnor.proxy.rpc.RpcConfiguration;
@@ -156,9 +157,14 @@ public class RpcProxyHandler implements Servlet {
                         final Boolean isValid = bitcoinRpcConnectorForValidation.validateBlockTemplate(blockTemplate);
                         nanoTimer.stop();
 
-                        Logger.debug("Validated template from " + rpcConfigurationForTemplate + " with " + rpcConfigurationForValidation + " in " + nanoTimer.getMillisecondsElapsed() + "ms. (" + (isValid ? "VALID" : "INVALID") + ")");
+                        if (isValid != null) {
+                            Logger.debug("Validated template from " + rpcConfigurationForTemplate + " with " + rpcConfigurationForValidation + " in " + nanoTimer.getMillisecondsElapsed() + "ms. (" + (isValid ? "VALID" : "INVALID") + ")");
+                        }
+                        else {
+                            Logger.debug("Template validation not supported by " + rpcConfigurationForValidation + ".");
+                        }
 
-                        if (isValid) {
+                        if (Util.coalesce(isValid, true)) {
                             final AtomicInteger currentIsValidCount = countOfValidBlockTemplates.get(rpcConfigurationForTemplate);
                             currentIsValidCount.incrementAndGet();
                         }
@@ -223,26 +229,49 @@ public class RpcProxyHandler implements Servlet {
             return _onGetBlockTemplateFailure(request);
         }
 
-        int validCount = 0;
-        for (final RpcConfiguration rpcConfiguration : rpcConfigurations) {
-            final BitcoinRpcConnector bitcoinRpcConnector = rpcConfiguration.getBitcoinRpcConnector();
-            final Boolean isValid = bitcoinRpcConnector.validateBlockTemplate(blockTemplate);
-            if (isValid) {
-                validCount += 1;
-            }
-            else {
-                Logger.debug("Template considered invalid by: " + rpcConfiguration);
-            }
+        final AtomicInteger validCount = new AtomicInteger(0);
+        try {
+            final BatchRunner<RpcConfiguration> batchRunner = new BatchRunner<>(1, true);
+            batchRunner.run(rpcConfigurations, new BatchRunner.Batch<RpcConfiguration>() {
+                @Override
+                public void run(final List<RpcConfiguration> rpcConfigurations) throws Exception {
+                    final NanoTimer nanoTimer = new NanoTimer();
+
+                    final RpcConfiguration rpcConfiguration = rpcConfigurations.get(0); // Workaround for non-specialization of BatchRunner of size 1.
+                    final BitcoinRpcConnector bitcoinRpcConnector = rpcConfiguration.getBitcoinRpcConnector();
+
+                    nanoTimer.start();
+                    final Boolean isValid = bitcoinRpcConnector.validateBlockTemplate(blockTemplate);
+                    nanoTimer.stop();
+
+                    if (isValid != null) {
+                        Logger.debug("Validated template from " + bestRpcConfiguration + " with " + rpcConfiguration + " in " + nanoTimer.getMillisecondsElapsed() + "ms. (" + (isValid ? "VALID" : "INVALID") + ")");
+                    }
+                    else {
+                        Logger.debug("Template validation not supported by " + rpcConfiguration + ".");
+                    }
+
+                    if (Util.coalesce(isValid, true)) {
+                        validCount.incrementAndGet();
+                    }
+                    else {
+                        Logger.debug("Template considered invalid by: " + rpcConfiguration);
+                    }
+                }
+            });
+        }
+        catch (final Exception exception) {
+            Logger.warn(exception);
         }
 
         final Sha256Hash previousBlockHash = blockTemplate.getPreviousBlockHash();
-        final int invalidCount = (nodeCount - validCount);
+        final int invalidCount = (nodeCount - validCount.get());
         if (invalidCount > 0) {
             Logger.warn("Block template considered invalid by " + invalidCount + " nodes.");
             return _onGetBlockTemplateFailure(request);
         }
 
-        Logger.info("Block template for height " + previousBlockHash + " considered valid by all nodes.");
+        Logger.info("Block template for previous block " + previousBlockHash + " considered valid by all nodes.");
         return response;
     }
 
@@ -252,27 +281,50 @@ public class RpcProxyHandler implements Servlet {
 
     @Override
     public Response onRequest(final Request request) {
+        final String rawMethod;
         final Method method;
         {
             final MutableByteArray rawPostData = MutableByteArray.wrap(request.getRawPostData());
             final Json requestJson = Json.parse(StringUtil.bytesToString(rawPostData.unwrap()));
-            final String methodString = requestJson.getString("method");
-            method = Method.fromString(methodString);
-        }
-
-        final RpcConfiguration rpcConfiguration = _nodeSelector.selectBestNode();
-        if (rpcConfiguration == null) {
-            final Response errorResponse = new Response();
-            errorResponse.setCode(Response.Codes.SERVER_ERROR);
-            errorResponse.setContent("No viable node connection found.");
-            return errorResponse;
+            rawMethod = requestJson.getString("method");
+            method = Method.fromString(rawMethod);
         }
 
         if (method == Method.GET_BLOCK_TEMPLATE) {
+            final RpcConfiguration rpcConfiguration = _nodeSelector.selectBestNode();
             return _onGetBlockTemplateRequest(rpcConfiguration, request);
         }
 
-        final BitcoinRpcConnector bitcoinRpcConnector = rpcConfiguration.getBitcoinRpcConnector();
-        return bitcoinRpcConnector.handleRequest(request);
+        final MutableList<RpcConfiguration> attemptedConfigurations = new MutableList<>();
+        Response defaultResponse = null;
+        while (true) {
+            final RpcConfiguration rpcConfiguration = _nodeSelector.selectBestNode(attemptedConfigurations);
+            if (rpcConfiguration == null) { break; } // Break if no viable nodes remain...
+
+            // Prevent trying the same node multiple times with the same request.
+            attemptedConfigurations.add(rpcConfiguration);
+
+            final BitcoinRpcConnector bitcoinRpcConnector = rpcConfiguration.getBitcoinRpcConnector();
+            final Response response = bitcoinRpcConnector.handleRequest(request);
+            if (response == null) { continue; }
+
+            if (Util.areEqual(Response.Codes.OK, response.getCode())) {
+                return response;
+            }
+
+            Logger.debug("Received non-ok response for " + rawMethod + ", trying next node.");
+            if (defaultResponse == null) {
+                defaultResponse = response;
+            }
+        }
+
+        if (defaultResponse != null) {
+            return defaultResponse;
+        }
+
+        final Response errorResponse = new Response();
+        errorResponse.setCode(Response.Codes.SERVER_ERROR);
+        errorResponse.setContent("No viable node connection found.");
+        return errorResponse;
     }
 }

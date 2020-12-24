@@ -33,10 +33,18 @@ public class RpcProxyServer {
     protected final SleepyService _chainWorkMonitor;
 
     protected RpcConfiguration _selectBestRpcConfiguration() {
-        return _selectBestRpcConfiguration(null);
+        return _selectBestRpcConfiguration(null, null);
     }
 
     protected RpcConfiguration _selectBestRpcConfiguration(final NotificationType requiredNotificationType) {
+        return _selectBestRpcConfiguration(requiredNotificationType, null);
+    }
+
+    protected RpcConfiguration _selectBestRpcConfiguration(final List<RpcConfiguration> excludedConfigurations) {
+        return _selectBestRpcConfiguration(null, excludedConfigurations);
+    }
+
+    protected RpcConfiguration _selectBestRpcConfiguration(final NotificationType requiredNotificationType, final List<RpcConfiguration> excludedConfigurations) {
         int bestHierarchy = Integer.MIN_VALUE;
         ChainHeight bestChainHeight = UNKNOWN_CHAIN_HEIGHT;
         RpcConfiguration bestRpcConfiguration = null;
@@ -55,6 +63,10 @@ public class RpcProxyServer {
 
             final int hierarchy = rpcConfiguration.getHierarchy();
             if ( (compareValue > 0) || (hierarchy <= bestHierarchy) ) {
+                if ( (excludedConfigurations != null) && excludedConfigurations.contains(rpcConfiguration) ) {
+                    continue;
+                }
+
                 bestChainHeight = chainHeight;
                 bestHierarchy = hierarchy;
                 bestRpcConfiguration = rpcConfiguration;
@@ -170,6 +182,19 @@ public class RpcProxyServer {
                 @Override
                 public RpcConfiguration selectBestNode() {
                     final RpcConfiguration bestRpcConfiguration = _selectBestRpcConfiguration();
+                    if (bestRpcConfiguration == null) {
+                        Logger.debug("No node available.");
+                        return null;
+                    }
+
+                    final ChainHeight bestChainHeight = _rpcConfigurations.get(bestRpcConfiguration);
+                    Logger.debug("Selected: " + bestRpcConfiguration + " " + bestChainHeight);
+                    return bestRpcConfiguration;
+                }
+
+                @Override
+                public RpcConfiguration selectBestNode(final List<RpcConfiguration> excludedConfiguration) {
+                    final RpcConfiguration bestRpcConfiguration = _selectBestRpcConfiguration(excludedConfiguration);
                     if (bestRpcConfiguration == null) {
                         Logger.debug("No node available.");
                         return null;

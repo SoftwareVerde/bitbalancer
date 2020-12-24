@@ -13,6 +13,6 @@ public class NoValidationBitcoinCoreRpcConnector extends BitcoinCoreRpcConnector
 
     @Override
     public Boolean validateBlockTemplate(final Block blockTemplate) {
-        return true;
+        return null;
     }
 }
