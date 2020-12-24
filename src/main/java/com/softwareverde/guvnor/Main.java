@@ -40,6 +40,7 @@ public class Main {
         Logger.setLogLevel(LogLevel.DEBUG);
         Logger.setLogLevel("com.softwareverde.network", LogLevel.WARN);
         Logger.setLogLevel("com.softwareverde.util", LogLevel.WARN);
+        Logger.setLogLevel("com.softwareverde.json", LogLevel.ERROR);
 
         if (arguments.length != 1) {
             System.err.println("Missing Argument: <configuration>");

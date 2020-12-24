@@ -22,6 +22,7 @@ import com.softwareverde.http.server.servlet.request.Request;
 import com.softwareverde.http.server.servlet.response.Response;
 import com.softwareverde.json.Json;
 import com.softwareverde.logging.Logger;
+import com.softwareverde.util.Container;
 import com.softwareverde.util.StringUtil;
 import com.softwareverde.util.timer.NanoTimer;
 
@@ -212,13 +213,16 @@ public class RpcProxyHandler implements Servlet {
         final List<RpcConfiguration> rpcConfigurations = _nodeSelector.getNodes();
         final BitcoinRpcConnector bestBitcoinRpcConnector = bestRpcConfiguration.getBitcoinRpcConnector();
         final Response response = bestBitcoinRpcConnector.handleRequest(request);
-        final Json responseJson = Json.parse(StringUtil.bytesToString(response.getContent()));
+
+        final String rawResponse = StringUtil.bytesToString(response.getContent());
+        final Json responseJson = (Json.isJson(rawResponse) ? Json.parse(rawResponse) : new Json());
 
         final int nodeCount = rpcConfigurations.getCount();
 
-        final String errorString = responseJson.getString("error");
-        if (! Util.isBlank(errorString)) {
-            Logger.debug("Received error from " + bestRpcConfiguration + ": " + errorString);
+        final Container<String> errorStringContainer = new Container<>();
+        final Boolean isSuccessfulResponse = _isSuccessfulResponse(response, responseJson, errorStringContainer);
+        if (! isSuccessfulResponse) {
+            Logger.debug("Received error from " + bestRpcConfiguration + ": " + errorStringContainer.value);
             return response;
         }
 
@@ -226,7 +230,7 @@ public class RpcProxyHandler implements Servlet {
         final Block blockTemplate = _assembleBlockTemplate(resultJson);
         if (blockTemplate == null) {
             Logger.warn("Unable to assemble block template.");
-            Logger.warn(responseJson);
+            Logger.debug(responseJson);
 
             return _onGetBlockTemplateFailure(request);
         }
@@ -277,17 +281,34 @@ public class RpcProxyHandler implements Servlet {
         return response;
     }
 
-    protected Boolean _isSuccessfulResponse(final Response response) {
+    protected Boolean _isSuccessfulResponse(final Response response, final Json preParsedResponse) {
+        return _isSuccessfulResponse(response, preParsedResponse, new Container<String>());
+    }
+
+    protected Boolean _isSuccessfulResponse(final Response response, final Json preParsedResponse, final Container<String> errorStringContainer) {
+        errorStringContainer.value = null;
         if (response == null) { return false; }
 
         if (! Util.areEqual(Response.Codes.OK, response.getCode())) {
             return false;
         }
 
-        final String rawResponse = StringUtil.bytesToString(response.getContent());
-        final Json responseJson = (Json.isJson(rawResponse) ? Json.parse(rawResponse) : new Json());
+        final Json responseJson;
+        if (preParsedResponse != null) {
+            responseJson = preParsedResponse;
+        }
+        else {
+            final String rawResponse = StringUtil.bytesToString(response.getContent());
+            responseJson = (Json.isJson(rawResponse) ? Json.parse(rawResponse) : new Json());
+        }
+
         final String errorString = responseJson.getString("error");
-        return Util.isBlank(errorString);
+        if (! Util.isBlank(errorString)) {
+            errorStringContainer.value = errorString;
+            return false;
+        }
+
+        return true;
     }
 
     public RpcProxyHandler(final NodeSelector nodeSelector) {
@@ -298,7 +319,7 @@ public class RpcProxyHandler implements Servlet {
     public Response onRequest(final Request request) {
         final String rawMethod;
         final Method method;
-        {
+        { // Parse the method from the request object...
             final MutableByteArray rawPostData = MutableByteArray.wrap(request.getRawPostData());
             final Json requestJson = Json.parse(StringUtil.bytesToString(rawPostData.unwrap()));
             rawMethod = requestJson.getString("method");
@@ -330,14 +351,15 @@ public class RpcProxyHandler implements Servlet {
             final Response response = bitcoinRpcConnector.handleRequest(request);
             nanoTimer.stop();
 
-            final Boolean responseWasSuccessful = _isSuccessfulResponse(response);
+            final Container<String> errorStringContainer = new Container<>();
+            final Boolean responseWasSuccessful = _isSuccessfulResponse(response, null, errorStringContainer);
             Logger.debug("Response received for " + rawMethod + " from " + rpcConfiguration + " in " + nanoTimer.getMillisecondsElapsed() + "ms.");
 
             if (responseWasSuccessful) {
                 return response;
             }
 
-            Logger.debug("Received non-ok response for " + rawMethod + ", trying next node.");
+            Logger.debug("Received non-ok response for " + rawMethod + ": " + errorStringContainer.value + ", trying next node.");
             if (defaultResponse == null) {
                 defaultResponse = response;
             }
