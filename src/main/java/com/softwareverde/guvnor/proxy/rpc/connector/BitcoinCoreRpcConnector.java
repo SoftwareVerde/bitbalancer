@@ -30,6 +30,21 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class BitcoinCoreRpcConnector implements BitcoinRpcConnector {
+    public static Map<NotificationType, String> getZmqEndpoints(final String host, final Map<NotificationType, Integer> zmqPorts) {
+        final HashMap<NotificationType, String> zmqEndpoints = new HashMap<>();
+        if (zmqPorts == null) { return zmqEndpoints; }
+
+        final String baseEndpointUri = ("tcp://" + host + ":");
+        for (final NotificationType notificationType : NotificationType.values()) {
+            final Integer zmqPort = zmqPorts.get(notificationType);
+            if (zmqPort == null) { continue; }
+
+            final String endpointUri = (baseEndpointUri + zmqPort);
+            zmqEndpoints.put(notificationType, endpointUri);
+        }
+        return zmqEndpoints;
+    }
+
     public static final String IDENTIFIER = "DEFAULT";
 
     protected final AtomicInteger _nextRequestId = new AtomicInteger(1);
@@ -278,7 +293,7 @@ public class BitcoinCoreRpcConnector implements BitcoinRpcConnector {
             _zmqEndpoints = _getZmqEndpoints();
         }
 
-        return _zmqEndpoints.isEmpty();
+        return (! _zmqEndpoints.isEmpty());
     }
 
     @Override

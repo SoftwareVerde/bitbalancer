@@ -226,7 +226,7 @@ public class BitcoinVerdeRpcConnector implements BitcoinRpcConnector {
             public void onNewBlockHeader(final Json json) {
                 final String blockHashString = json.getString("hash");
                 final Sha256Hash blockHash = Sha256Hash.fromHexString(blockHashString);
-                Logger.debug("Block: " + blockHash);
+                Logger.trace("Block: " + blockHash);
 
                 final Notification notification = new Notification(NotificationType.BLOCK_HASH, blockHash);
                 notificationCallback.onNewNotification(notification);
@@ -236,7 +236,7 @@ public class BitcoinVerdeRpcConnector implements BitcoinRpcConnector {
             public void onNewTransaction(final Json json) {
                 final String transactionHashString = json.getString("hash");
                 final Sha256Hash transactionHash = Sha256Hash.fromHexString(transactionHashString);
-                Logger.debug("Transaction: " + transactionHash);
+                Logger.trace("Transaction: " + transactionHash);
 
                 final Notification notification = new Notification(NotificationType.TRANSACTION_HASH, transactionHash);
                 notificationCallback.onNewNotification(notification);

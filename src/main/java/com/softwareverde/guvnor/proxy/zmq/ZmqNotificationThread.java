@@ -57,6 +57,7 @@ public class ZmqNotificationThread extends Thread {
                         }
 
                         if ( (notificationType != null) && (payload != null) ) {
+                            Logger.trace(endpointUri + " - " + notificationType + ": " + payload);
                             final Notification notification = new Notification(notificationType, payload);
                             callback.onNewNotification(notification);
                         }

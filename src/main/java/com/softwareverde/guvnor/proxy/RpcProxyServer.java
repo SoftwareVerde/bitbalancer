@@ -176,7 +176,7 @@ public class RpcProxyServer {
                     }
 
                     final ChainHeight bestChainHeight = _rpcConfigurations.get(bestRpcConfiguration);
-                    Logger.debug("Selected: " + bestRpcConfiguration.getHost() + ":" + bestRpcConfiguration.getPort() + " " + bestChainHeight);
+                    Logger.debug("Selected: " + bestRpcConfiguration + " " + bestChainHeight);
                     return bestRpcConfiguration;
                 }
 

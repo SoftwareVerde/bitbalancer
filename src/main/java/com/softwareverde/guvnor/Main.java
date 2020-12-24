@@ -76,12 +76,17 @@ public class Main {
 
                         case BitcoinCoreRpcConnector.IDENTIFIER:
                         default: {
-                            bitcoinRpcConnector = new BitcoinCoreRpcConnector(bitcoinNodeAddress, rpcCredentials);
+                            final BitcoinCoreRpcConnector bitcoinCoreRpcConnector = new BitcoinCoreRpcConnector(bitcoinNodeAddress, rpcCredentials);
+                            final Map<NotificationType, String> zmqEndpoints = BitcoinCoreRpcConnector.getZmqEndpoints(host, nodeProperties.getZmqPorts());
+                            for (final NotificationType notificationType : zmqEndpoints.keySet()) {
+                                final String endpointUri = zmqEndpoints.get(notificationType);
+                                bitcoinCoreRpcConnector.setZmqEndpoint(notificationType, endpointUri);
+                            }
+                            bitcoinRpcConnector = bitcoinCoreRpcConnector;
                         } break;
                     }
                 }
-                final Map<NotificationType, Integer> zmqPorts = nodeProperties.getZmqPorts();
-                final RpcConfiguration rpcConfiguration = new RpcConfiguration(name, bitcoinRpcConnector, preferenceOrder, zmqPorts);
+                final RpcConfiguration rpcConfiguration = new RpcConfiguration(name, bitcoinRpcConnector, preferenceOrder);
 
                 rpcConfigurations.add(rpcConfiguration);
                 Logger.info("Added endpoint: " + preferenceOrder + "=" + host + ":" + port + " (" + name + ")");
