@@ -5,6 +5,7 @@ import com.softwareverde.bitcoin.util.Util;
 import com.softwareverde.constable.bytearray.MutableByteArray;
 import com.softwareverde.constable.list.List;
 import com.softwareverde.constable.list.mutable.MutableList;
+import com.softwareverde.guvnor.proxy.node.selector.NodeSelector;
 import com.softwareverde.guvnor.proxy.rpc.RpcConfiguration;
 import com.softwareverde.guvnor.proxy.rpc.connector.BitcoinRpcConnector;
 import com.softwareverde.guvnor.proxy.rpc.connector.BlockTemplate;

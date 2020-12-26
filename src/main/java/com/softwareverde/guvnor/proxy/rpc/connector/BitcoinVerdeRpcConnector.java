@@ -88,12 +88,22 @@ public class BitcoinVerdeRpcConnector implements BitcoinRpcConnector {
         final Long blockHeight;
         try (final NodeJsonRpcConnection nodeJsonRpcConnection = new NodeJsonRpcConnection(host, port, _threadPool)) {
             final Json responseJson = nodeJsonRpcConnection.getBlockHeight();
+            if (responseJson == null) {
+                Logger.warn("Unable to get block height from node.");
+                return null;
+            }
+
             blockHeight = responseJson.getLong("blockHeight");
         }
 
         final ChainWork chainWork;
         try (final NodeJsonRpcConnection nodeJsonRpcConnection = new NodeJsonRpcConnection(host, port, _threadPool)) {
             final Json responseJson = nodeJsonRpcConnection.getBlockHeader(blockHeight);
+            if (responseJson == null) {
+                Logger.warn("Unable to get chain work from node.");
+                return null;
+            }
+
             final Json blockJson = responseJson.get("block");
             final String chainWorkString = blockJson.getString("chainWork");
             chainWork = ChainWork.fromHexString(chainWorkString);
@@ -111,9 +121,14 @@ public class BitcoinVerdeRpcConnector implements BitcoinRpcConnector {
         try (final NodeJsonRpcConnection nodeJsonRpcConnection = new NodeJsonRpcConnection(host, port, _threadPool)) {
             prototypeBlockJson = nodeJsonRpcConnection.getPrototypeBlock(true);
         }
+        if (prototypeBlockJson == null) {
+            Logger.warn("Error executing get-prototype from node.");
+            return null;
+        }
 
         final BlockInflater blockInflater = new BlockInflater();
-        final Block block = blockInflater.fromBytes(ByteArray.fromHexString(prototypeBlockJson.getString("block")));
+        final ByteArray blockData = ByteArray.fromHexString(prototypeBlockJson.getString("block"));
+        final Block block = blockInflater.fromBytes(blockData);
         if (block == null) {
             Logger.warn("Error retrieving prototype block.");
             return null;
@@ -122,6 +137,11 @@ public class BitcoinVerdeRpcConnector implements BitcoinRpcConnector {
         final long blockHeight;
         try (final NodeJsonRpcConnection blockHeightNodeJsonRpcConnection = new NodeJsonRpcConnection(host, port, _threadPool)) {
             final Json responseJson = blockHeightNodeJsonRpcConnection.getBlockHeight();
+            if (responseJson == null) {
+                Logger.warn("Error executing get-prototype from node.");
+                return null;
+            }
+
             blockHeight = (responseJson.getLong("blockHeight") + 1L);
         }
 
@@ -183,6 +203,10 @@ public class BitcoinVerdeRpcConnector implements BitcoinRpcConnector {
         final Json responseJson;
         try (final NodeJsonRpcConnection nodeJsonRpcConnection = new NodeJsonRpcConnection(host, port, _threadPool)) {
             responseJson = nodeJsonRpcConnection.validatePrototypeBlock(block);
+        }
+        if (responseJson == null) {
+            Logger.warn("Unable to validate template block.");
+            return null;
         }
 
         final Json validationResult = responseJson.get("blockValidation");

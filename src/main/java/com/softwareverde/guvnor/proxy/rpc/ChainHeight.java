@@ -7,6 +7,8 @@ import com.softwareverde.util.Util;
 import java.util.Comparator;
 
 public class ChainHeight implements Comparable<ChainHeight> {
+    public static final ChainHeight UNKNOWN_CHAIN_HEIGHT = new ChainHeight(0L, null);
+
     protected static final Comparator<ChainWork> CHAIN_WORK_COMPARATOR = new Comparator<ChainWork>() {
         @Override
         public int compare(final ChainWork chainWork0, final ChainWork chainWork1) {

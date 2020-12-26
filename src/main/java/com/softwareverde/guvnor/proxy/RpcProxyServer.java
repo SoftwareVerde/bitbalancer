@@ -4,6 +4,8 @@ import com.softwareverde.concurrent.service.SleepyService;
 import com.softwareverde.constable.list.List;
 import com.softwareverde.constable.list.mutable.MutableList;
 import com.softwareverde.cryptography.hash.sha256.Sha256Hash;
+import com.softwareverde.guvnor.proxy.node.selector.HashMapNodeSelector;
+import com.softwareverde.guvnor.proxy.node.selector.NodeSelector;
 import com.softwareverde.guvnor.proxy.rpc.ChainHeight;
 import com.softwareverde.guvnor.proxy.rpc.NotificationCallback;
 import com.softwareverde.guvnor.proxy.rpc.RpcConfiguration;
@@ -16,65 +18,17 @@ import com.softwareverde.logging.Logger;
 import com.softwareverde.util.HexUtil;
 import com.softwareverde.util.Util;
 
-import java.util.HashMap;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
 
 public class RpcProxyServer {
-    protected static final AtomicInteger NEXT_REQUEST_ID = new AtomicInteger(1);
-    protected static final ChainHeight UNKNOWN_CHAIN_HEIGHT = new ChainHeight(0L, null);
-
     protected final Integer _port;
     protected final HttpServer _httpServer;
-    protected final HashMap<RpcConfiguration, ChainHeight> _rpcConfigurations = new HashMap<>();
+    protected final ConcurrentHashMap<RpcConfiguration, ChainHeight> _rpcConfigurations = new ConcurrentHashMap<>();
+    protected final NodeSelector _nodeSelector;
 
     protected final ConcurrentHashMap<NotificationType, ZmqNotificationPublisherThread> _zmqPublisherThreads = new ConcurrentHashMap<>();
 
     protected final SleepyService _chainWorkMonitor;
-
-    protected RpcConfiguration _selectBestRpcConfiguration() {
-        return _selectBestRpcConfiguration(null, null);
-    }
-
-    protected RpcConfiguration _selectBestRpcConfiguration(final NotificationType requiredNotificationType) {
-        return _selectBestRpcConfiguration(requiredNotificationType, null);
-    }
-
-    protected RpcConfiguration _selectBestRpcConfiguration(final List<RpcConfiguration> excludedConfigurations) {
-        return _selectBestRpcConfiguration(null, excludedConfigurations);
-    }
-
-    protected RpcConfiguration _selectBestRpcConfiguration(final NotificationType requiredNotificationType, final List<RpcConfiguration> excludedConfigurations) {
-        int bestHierarchy = Integer.MIN_VALUE;
-        ChainHeight bestChainHeight = UNKNOWN_CHAIN_HEIGHT;
-        RpcConfiguration bestRpcConfiguration = null;
-
-        for (final RpcConfiguration rpcConfiguration : _rpcConfigurations.keySet()) {
-            final ChainHeight chainHeight = _rpcConfigurations.get(rpcConfiguration);
-
-            if (requiredNotificationType != null) {
-                final BitcoinRpcConnector bitcoinRpcConnector = rpcConfiguration.getBitcoinRpcConnector();
-                final boolean hasNotificationType = bitcoinRpcConnector.supportsNotification(requiredNotificationType);
-                if (! hasNotificationType) { continue; }
-            }
-
-            final int compareValue = chainHeight.compareTo(bestChainHeight);
-            if (compareValue < 0) { continue; }
-
-            final int hierarchy = rpcConfiguration.getHierarchy();
-            if ( (compareValue > 0) || (hierarchy <= bestHierarchy) ) {
-                if ( (excludedConfigurations != null) && excludedConfigurations.contains(rpcConfiguration) ) {
-                    continue;
-                }
-
-                bestChainHeight = chainHeight;
-                bestHierarchy = hierarchy;
-                bestRpcConfiguration = rpcConfiguration;
-            }
-        }
-
-        return bestRpcConfiguration;
-    }
 
     protected void _relayNotification(final Notification notification) {
         final NotificationType notificationType = notification.notificationType;
@@ -139,7 +93,7 @@ public class RpcProxyServer {
                     }
                 }
 
-                final RpcConfiguration bestRpcConfiguration = _selectBestRpcConfiguration(notification.notificationType);
+                final RpcConfiguration bestRpcConfiguration = _nodeSelector.selectBestNode(notification.notificationType);
                 if ( (bestRpcConfiguration != null) && Util.areEqual(bestRpcConfiguration, rpcConfiguration) ) {
                     // If the notification if from the highest ChainHeight node with ZMQ enabled for this message type, then relay the message.
                     Logger.trace("Relaying: " + notification.notificationType + " " + HexUtil.toHexString(notification.payload.getBytes(0, 32)) + " +" + (notification.payload.getByteCount() - 32) + " from " + rpcConfiguration);
@@ -154,7 +108,7 @@ public class RpcProxyServer {
     public RpcProxyServer(final Integer port, final List<RpcConfiguration> rpcConfigurations, final ZmqConfiguration zmqConfiguration) {
         _port = port;
         for (final RpcConfiguration rpcConfiguration : rpcConfigurations) {
-            _rpcConfigurations.put(rpcConfiguration, UNKNOWN_CHAIN_HEIGHT);
+            _rpcConfigurations.put(rpcConfiguration, ChainHeight.UNKNOWN_CHAIN_HEIGHT);
             _subscribeToNotifications(rpcConfiguration);
         }
         for (final RpcConfiguration rpcConfiguration : rpcConfigurations) {
@@ -176,43 +130,13 @@ public class RpcProxyServer {
             zmqNotificationPublisherThread.start();
         }
 
+        _nodeSelector = new HashMapNodeSelector(_rpcConfigurations);
+
         final Endpoint rpcProxyEndpoint;
         {
-            final NodeSelector nodeSelector = new NodeSelector() {
-                @Override
-                public RpcConfiguration selectBestNode() {
-                    final RpcConfiguration bestRpcConfiguration = _selectBestRpcConfiguration();
-                    if (bestRpcConfiguration == null) {
-                        Logger.debug("No node available.");
-                        return null;
-                    }
-
-                    final ChainHeight bestChainHeight = _rpcConfigurations.get(bestRpcConfiguration);
-                    Logger.debug("Selected: " + bestRpcConfiguration + " " + bestChainHeight);
-                    return bestRpcConfiguration;
-                }
-
-                @Override
-                public RpcConfiguration selectBestNode(final List<RpcConfiguration> excludedConfiguration) {
-                    final RpcConfiguration bestRpcConfiguration = _selectBestRpcConfiguration(excludedConfiguration);
-                    if (bestRpcConfiguration == null) {
-                        Logger.debug("No node available.");
-                        return null;
-                    }
-
-                    final ChainHeight bestChainHeight = _rpcConfigurations.get(bestRpcConfiguration);
-                    Logger.debug("Selected: " + bestRpcConfiguration + " " + bestChainHeight);
-                    return bestRpcConfiguration;
-                }
-
-                @Override
-                public List<RpcConfiguration> getNodes() {
-                    return new MutableList<>(_rpcConfigurations.keySet());
-                }
-            };
 
             rpcProxyEndpoint = new Endpoint(
-                new RpcProxyHandler(nodeSelector)
+                new RpcProxyHandler(_nodeSelector)
             );
             rpcProxyEndpoint.setPath("/");
             rpcProxyEndpoint.setStrictPathEnabled(true);
@@ -221,7 +145,7 @@ public class RpcProxyServer {
         final NotifyEndpoint.Context notifyContext = new NotifyEndpoint.Context() {
             @Override
             public RpcConfiguration getBestRpcConfiguration() {
-                return _selectBestRpcConfiguration();
+                return _nodeSelector.selectBestNode();
             }
 
             @Override
@@ -290,8 +214,8 @@ public class RpcProxyServer {
             protected Boolean _run() {
                 final ChainHeight bestChainHeight;
                 {
-                    final RpcConfiguration bestRpcConfiguration = _selectBestRpcConfiguration();
-                    bestChainHeight = Util.coalesce(_rpcConfigurations.get(bestRpcConfiguration), UNKNOWN_CHAIN_HEIGHT);
+                    final RpcConfiguration bestRpcConfiguration = _nodeSelector.selectBestNode();
+                    bestChainHeight = Util.coalesce(_rpcConfigurations.get(bestRpcConfiguration), ChainHeight.UNKNOWN_CHAIN_HEIGHT);
                 }
 
                 for (final RpcConfiguration rpcConfiguration : _rpcConfigurations.keySet()) {
