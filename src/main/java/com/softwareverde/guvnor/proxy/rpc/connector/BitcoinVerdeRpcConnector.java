@@ -28,6 +28,55 @@ import com.softwareverde.util.type.time.SystemTime;
 public class BitcoinVerdeRpcConnector implements BitcoinRpcConnector {
     public static final String IDENTIFIER = "VERDE";
 
+    public static BlockTemplate toBlockTemplate(final Block block, final Long blockHeight, final SystemTime systemTime) {
+        final BlockTemplate blockTemplate = new BlockTemplate();
+
+        blockTemplate.setBlockVersion(block.getVersion());
+        blockTemplate.setDifficulty(block.getDifficulty());
+        blockTemplate.setPreviousBlockHash(block.getPreviousBlockHash());
+        blockTemplate.setMinimumBlockTime(block.getTimestamp());
+        blockTemplate.setNonceRange(BlockTemplate.DEFAULT_NONCE_RANGE);
+
+        blockTemplate.setBlockHeight(blockHeight);
+
+        Transaction coinbaseTransaction = null;
+        for (final Transaction transaction : block.getTransactions()) {
+            if (coinbaseTransaction == null) {
+                coinbaseTransaction = transaction;
+                continue;
+            }
+
+            final Long fee = 0L; // Unsupported.
+            final Integer signatureOperationCount = 0; // Unsupported.
+            blockTemplate.addTransaction(transaction, fee, signatureOperationCount);
+        }
+
+        if (coinbaseTransaction != null) {
+            blockTemplate.setCoinbaseAmount(coinbaseTransaction.getTotalOutputValue());
+        }
+
+        final long maxBlockByteCount = BlockInflater.MAX_BYTE_COUNT;
+        final long maximumSignatureOperationCount = (maxBlockByteCount / BlockValidator.MIN_BYTES_PER_SIGNATURE_OPERATION);
+
+        final Long now = systemTime.getCurrentTimeInSeconds();
+        blockTemplate.setCurrentTime(now);
+        blockTemplate.setMaxSignatureOperationCount(maximumSignatureOperationCount);
+        blockTemplate.setMaxBlockByteCount(maxBlockByteCount);
+
+        blockTemplate.setTarget(block.getDifficulty().getBytes());
+
+        final String longPollId = (block.getPreviousBlockHash() + "" + now).toLowerCase();
+        blockTemplate.setLongPollId(longPollId);
+
+        blockTemplate.setCoinbaseAuxFlags("");
+        blockTemplate.addCapability("proposal");
+        blockTemplate.addMutableField("time");
+        blockTemplate.addMutableField("transactions");
+        blockTemplate.addMutableField("prevblock");
+
+        return blockTemplate;
+    }
+
     protected final SystemTime _systemTime;
     protected final ThreadPool _threadPool;
     protected final BitcoinNodeAddress _bitcoinNodeAddress;
@@ -145,52 +194,7 @@ public class BitcoinVerdeRpcConnector implements BitcoinRpcConnector {
             blockHeight = (responseJson.getLong("blockHeight") + 1L);
         }
 
-        final BlockTemplate blockTemplate = new BlockTemplate();
-
-        blockTemplate.setBlockVersion(block.getVersion());
-        blockTemplate.setDifficulty(block.getDifficulty());
-        blockTemplate.setPreviousBlockHash(block.getPreviousBlockHash());
-        blockTemplate.setMinimumBlockTime(block.getTimestamp());
-        blockTemplate.setNonceRange(BlockTemplate.DEFAULT_NONCE_RANGE);
-
-        blockTemplate.setBlockHeight(blockHeight);
-
-        Transaction coinbaseTransaction = null;
-        for (final Transaction transaction : block.getTransactions()) {
-            if (coinbaseTransaction == null) {
-                coinbaseTransaction = transaction;
-                continue;
-            }
-
-            final Long fee = 0L; // Unsupported.
-            final Integer signatureOperationCount = 0; // Unsupported.
-            blockTemplate.addTransaction(transaction, fee, signatureOperationCount);
-        }
-
-        if (coinbaseTransaction != null) {
-            blockTemplate.setCoinbaseAmount(coinbaseTransaction.getTotalOutputValue());
-        }
-
-        final long maxBlockByteCount = BlockInflater.MAX_BYTE_COUNT;
-        final long maximumSignatureOperationCount = (maxBlockByteCount / BlockValidator.MIN_BYTES_PER_SIGNATURE_OPERATION);
-
-        final Long now = _systemTime.getCurrentTimeInSeconds();
-        blockTemplate.setCurrentTime(now);
-        blockTemplate.setMaxSignatureOperationCount(maximumSignatureOperationCount);
-        blockTemplate.setMaxBlockByteCount(maxBlockByteCount);
-
-        blockTemplate.setTarget(block.getDifficulty().getBytes());
-
-        final String longPollId = (block.getPreviousBlockHash() + "" + now).toLowerCase();
-        blockTemplate.setLongPollId(longPollId);
-
-        blockTemplate.setCoinbaseAuxFlags("");
-        blockTemplate.addCapability("proposal");
-        blockTemplate.addMutableField("time");
-        blockTemplate.addMutableField("transactions");
-        blockTemplate.addMutableField("prevblock");
-
-        return blockTemplate;
+        return BitcoinVerdeRpcConnector.toBlockTemplate(block, blockHeight, _systemTime);
     }
 
     @Override

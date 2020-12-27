@@ -1,6 +1,10 @@
 package com.softwareverde.guvnor.proxy;
 
+import com.softwareverde.bitcoin.block.header.BlockHeader;
+import com.softwareverde.bitcoin.block.header.BlockHeaderInflater;
+import com.softwareverde.bitcoin.util.StringUtil;
 import com.softwareverde.concurrent.service.SleepyService;
+import com.softwareverde.constable.bytearray.ByteArray;
 import com.softwareverde.constable.list.List;
 import com.softwareverde.constable.list.mutable.MutableList;
 import com.softwareverde.cryptography.hash.sha256.Sha256Hash;
@@ -25,6 +29,7 @@ public class RpcProxyServer {
     protected final HttpServer _httpServer;
     protected final ConcurrentHashMap<RpcConfiguration, ChainHeight> _rpcConfigurations = new ConcurrentHashMap<>();
     protected final NodeSelector _nodeSelector;
+    protected final BlockTemplateManager _blockTemplateManager;
 
     protected final ConcurrentHashMap<NotificationType, ZmqNotificationPublisherThread> _zmqPublisherThreads = new ConcurrentHashMap<>();
 
@@ -66,6 +71,7 @@ public class RpcProxyServer {
         final NotificationCallback callback = new NotificationCallback() {
             @Override
             public void onNewNotification(final Notification notification) {
+                BlockHeader blockHeader = null;
                 boolean shouldUpdateChainHeight = false;
                 if (hasBlockHashEndpoint) {
                     if (Util.areEqual(NotificationType.BLOCK_HASH, notification.notificationType)) {
@@ -75,6 +81,13 @@ public class RpcProxyServer {
                 else if (hasBlockEndpoint) {
                     if (Util.areEqual(NotificationType.BLOCK, notification.notificationType)) {
                         shouldUpdateChainHeight = true;
+
+                        final String blockHeaderHexString = StringUtil.bytesToString(
+                            notification.payload.getBytes(0, (BlockHeaderInflater.BLOCK_HEADER_BYTE_COUNT * 2))
+                        );
+                        final ByteArray blockHeaderBytes = ByteArray.fromHexString(blockHeaderHexString);
+                        final BlockHeaderInflater blockHeaderInflater = new BlockHeaderInflater();
+                        blockHeader = blockHeaderInflater.fromBytes(blockHeaderBytes);
                     }
                 }
 
@@ -87,6 +100,10 @@ public class RpcProxyServer {
                         final ChainHeight oldChainHeight = _rpcConfigurations.put(rpcConfiguration, chainHeight);
 
                         if (chainHeight.compareTo(oldChainHeight) > 0) {
+                            if (_blockTemplateManager instanceof CachingBlockTemplateManager) {
+                                ((CachingBlockTemplateManager) _blockTemplateManager).onNewBlock(blockHeader, chainHeight);
+                            }
+
                             Logger.debug("New best block detected. Refreshing all nodes' chainHeights.");
                             _updateChainHeights(chainHeight);
                         }
@@ -105,8 +122,19 @@ public class RpcProxyServer {
         bitcoinRpcConnector.subscribeToNotifications(callback);
     }
 
-    public RpcProxyServer(final Integer port, final List<RpcConfiguration> rpcConfigurations, final ZmqConfiguration zmqConfiguration) {
+    public RpcProxyServer(final Integer port, final List<RpcConfiguration> rpcConfigurations, final ZmqConfiguration zmqConfiguration, final Long blockTemplateCacheDuration) {
         _port = port;
+        _nodeSelector = new HashMapNodeSelector(_rpcConfigurations);
+
+        if (Util.coalesce(blockTemplateCacheDuration) > 0L) {
+            final CachingBlockTemplateManager blockTemplateManager = new CachingBlockTemplateManager(_nodeSelector);
+            blockTemplateManager.setBlockTemplatePollPeriod(blockTemplateCacheDuration);
+            _blockTemplateManager = blockTemplateManager;
+        }
+        else {
+            _blockTemplateManager = new BlockTemplateManager(_nodeSelector);
+        }
+
         for (final RpcConfiguration rpcConfiguration : rpcConfigurations) {
             _rpcConfigurations.put(rpcConfiguration, ChainHeight.UNKNOWN_CHAIN_HEIGHT);
             _subscribeToNotifications(rpcConfiguration);
@@ -130,13 +158,11 @@ public class RpcProxyServer {
             zmqNotificationPublisherThread.start();
         }
 
-        _nodeSelector = new HashMapNodeSelector(_rpcConfigurations);
-
         final Endpoint rpcProxyEndpoint;
         {
 
             rpcProxyEndpoint = new Endpoint(
-                new RpcProxyHandler(_nodeSelector)
+                new RpcProxyHandler(_nodeSelector, _blockTemplateManager)
             );
             rpcProxyEndpoint.setPath("/");
             rpcProxyEndpoint.setStrictPathEnabled(true);
@@ -248,11 +274,17 @@ public class RpcProxyServer {
     public void start() {
         _httpServer.start();
         _chainWorkMonitor.start();
+        if (_blockTemplateManager instanceof CachingBlockTemplateManager) {
+            ((CachingBlockTemplateManager) _blockTemplateManager).start();
+        }
     }
 
     public void stop() {
         _httpServer.stop();
         _chainWorkMonitor.stop();
+        if (_blockTemplateManager instanceof CachingBlockTemplateManager) {
+            ((CachingBlockTemplateManager) _blockTemplateManager).stop();
+        }
     }
 
     public Integer getPort() {

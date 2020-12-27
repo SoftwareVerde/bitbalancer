@@ -130,6 +130,10 @@ public class BlockTemplate implements Jsonable {
         return _previousBlockHash;
     }
 
+    public Integer getTransactionCount() {
+        return _transactions.getCount();
+    }
+
     public Block toBlock() {
         final AddressInflater addressInflater = new AddressInflater();
         final TransactionInflater transactionInflater = new TransactionInflater();

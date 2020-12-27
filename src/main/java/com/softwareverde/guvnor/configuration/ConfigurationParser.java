@@ -92,7 +92,9 @@ public class ConfigurationParser {
             serverZmqPorts = (portMap.isEmpty() ? null : portMap);
         }
 
-        return new Configuration(rpcPort, nodePropertiesList, serverZmqPorts);
+        final Long blockTemplateCacheDuration = json.getOrNull("cacheTemplateDuration", Json.Types.LONG);
+
+        return new Configuration(rpcPort, nodePropertiesList, serverZmqPorts, blockTemplateCacheDuration);
     }
 
     public Configuration parseConfigurationFile(final String fileName) {

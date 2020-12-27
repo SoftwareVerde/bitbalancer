@@ -1,5 +1,6 @@
 {
   "port": 8332,
+  "cacheTemplateDuration": 10000,
   "nodes": [
     {
       "name": "node-00",

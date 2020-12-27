@@ -104,7 +104,9 @@ public class Main {
             zmqConfiguration.setPort(notificationType, zmqPort);
         }
 
-        _rpcProxyServer = new RpcProxyServer(rpcPort, rpcConfigurations, zmqConfiguration);
+        final Long blockTemplateCacheDuration = configuration.getBlockTemplateCacheDuration();
+
+        _rpcProxyServer = new RpcProxyServer(rpcPort, rpcConfigurations, zmqConfiguration, blockTemplateCacheDuration);
     }
 
     public void run() {

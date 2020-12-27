@@ -51,7 +51,7 @@ public class BlockTemplateManager {
                         Logger.debug("Failed to obtain template from " + rpcConfiguration + " in " + nanoTimer.getMillisecondsElapsed() + "ms.");
                     }
                     else {
-                        Logger.debug("Obtained template from " + rpcConfiguration + " in " + nanoTimer.getMillisecondsElapsed() + "ms.");
+                        Logger.info("Obtained template from " + rpcConfiguration + " in " + nanoTimer.getMillisecondsElapsed() + "ms.");
                     }
                 }
             });
@@ -118,11 +118,18 @@ public class BlockTemplateManager {
         _nodeSelector = nodeSelector;
     }
 
-    public BlockTemplate getBlockTemplate(final RpcConfiguration bestRpcConfiguration) {
-        final List<RpcConfiguration> rpcConfigurations = _nodeSelector.getNodes();
+    public BlockTemplate getBlockTemplate() {
+        final RpcConfiguration bestRpcConfiguration = _nodeSelector.selectBestNode();
         final BitcoinRpcConnector bestBitcoinRpcConnector = bestRpcConfiguration.getBitcoinRpcConnector();
 
+        final List<RpcConfiguration> rpcConfigurations = _nodeSelector.getNodes();
+
+        final NanoTimer nanoTimer = new NanoTimer();
+        nanoTimer.start();
         final BlockTemplate blockTemplate = bestBitcoinRpcConnector.getBlockTemplate();
+        nanoTimer.stop();
+
+        Logger.info("Block template acquired in " + nanoTimer.getMillisecondsElapsed() + "ms.");
 
         final int nodeCount = rpcConfigurations.getCount();
         final Container<String> errorStringContainer = new Container<>();

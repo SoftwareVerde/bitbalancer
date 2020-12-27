@@ -43,9 +43,9 @@ public class RpcProxyHandler implements Servlet {
     protected final NodeSelector _nodeSelector;
     protected final BlockTemplateManager _blockTemplateManager;
 
-    public RpcProxyHandler(final NodeSelector nodeSelector) {
+    public RpcProxyHandler(final NodeSelector nodeSelector, final BlockTemplateManager blockTemplateManager) {
         _nodeSelector = nodeSelector;
-        _blockTemplateManager = new BlockTemplateManager(nodeSelector);
+        _blockTemplateManager = blockTemplateManager;
     }
 
     @Override
@@ -64,8 +64,11 @@ public class RpcProxyHandler implements Servlet {
         Logger.debug("Routing: " + rawMethod);
 
         if (method == Method.GET_BLOCK_TEMPLATE) {
-            final RpcConfiguration rpcConfiguration = _nodeSelector.selectBestNode();
-            final BlockTemplate blockTemplate = _blockTemplateManager.getBlockTemplate(rpcConfiguration);
+            final NanoTimer nanoTimer = new NanoTimer();
+            nanoTimer.start();
+            final BlockTemplate blockTemplate = _blockTemplateManager.getBlockTemplate();
+            nanoTimer.stop();
+            Logger.info("Block template acquired in " + nanoTimer.getMillisecondsElapsed() + "ms.");
 
             final Response response = new Response();
 
