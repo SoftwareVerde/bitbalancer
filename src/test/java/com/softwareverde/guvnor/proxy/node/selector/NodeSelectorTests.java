@@ -1,6 +1,8 @@
 package com.softwareverde.guvnor.proxy.node.selector;
 
 import com.softwareverde.bitcoin.block.header.difficulty.work.ChainWork;
+import com.softwareverde.constable.list.List;
+import com.softwareverde.constable.list.immutable.ImmutableList;
 import com.softwareverde.guvnor.proxy.rpc.ChainHeight;
 import com.softwareverde.guvnor.proxy.rpc.RpcConfiguration;
 import com.softwareverde.guvnor.proxy.rpc.connector.FakeBitcoinRpcConnector;
@@ -8,7 +10,6 @@ import org.junit.Assert;
 import org.junit.Test;
 
 import java.math.BigInteger;
-import java.util.HashMap;
 
 public class NodeSelectorTests {
     public static ChainHeight makeFakeChainHeight(final Long blockHeight) {
@@ -37,12 +38,12 @@ public class NodeSelectorTests {
             2
         );
 
-        final HashMap<RpcConfiguration, ChainHeight> chainHeights = new HashMap<>();
-        chainHeights.put(rpcConfiguration02, makeFakeChainHeight(1L));
-        chainHeights.put(expectedRpcConfiguration, makeFakeChainHeight(2L)); // Configuration is preferred and ahead.
-        chainHeights.put(rpcConfiguration03, makeFakeChainHeight(1L));
+        final List<RpcConfiguration> rpcConfigurations = new ImmutableList<>(expectedRpcConfiguration, rpcConfiguration02, rpcConfiguration03);
+        expectedRpcConfiguration.setChainHeight(makeFakeChainHeight(2L)); // Configuration is preferred and ahead.
+        rpcConfiguration02.setChainHeight(makeFakeChainHeight(1L));
+        rpcConfiguration03.setChainHeight(makeFakeChainHeight(1L));
 
-        final NodeSelector nodeSelector = new HashMapNodeSelector(chainHeights);
+        final NodeSelector nodeSelector = new HashMapNodeSelector(rpcConfigurations);
 
         // Action
         final RpcConfiguration rpcConfiguration = nodeSelector.selectBestNode();
@@ -74,12 +75,12 @@ public class NodeSelectorTests {
             2
         );
 
-        final HashMap<RpcConfiguration, ChainHeight> chainHeights = new HashMap<>();
-        chainHeights.put(rpcConfiguration02, makeFakeChainHeight(2L));
-        chainHeights.put(expectedRpcConfiguration, makeFakeChainHeight(2L)); // Configuration is preferred.
-        chainHeights.put(rpcConfiguration03, makeFakeChainHeight(2L));
+        final List<RpcConfiguration> rpcConfigurations = new ImmutableList<>(expectedRpcConfiguration, rpcConfiguration02, rpcConfiguration03);
+        expectedRpcConfiguration.setChainHeight(makeFakeChainHeight(2L)); // Configuration is preferred.
+        rpcConfiguration02.setChainHeight(makeFakeChainHeight(2L));
+        rpcConfiguration03.setChainHeight(makeFakeChainHeight(2L));
 
-        final NodeSelector nodeSelector = new HashMapNodeSelector(chainHeights);
+        final NodeSelector nodeSelector = new HashMapNodeSelector(rpcConfigurations);
 
         // Action
         final RpcConfiguration rpcConfiguration = nodeSelector.selectBestNode();
@@ -110,12 +111,12 @@ public class NodeSelectorTests {
             2
         );
 
-        final HashMap<RpcConfiguration, ChainHeight> chainHeights = new HashMap<>();
-        chainHeights.put(rpcConfiguration01, makeFakeChainHeight(1L)); // Configuration is behind.
-        chainHeights.put(rpcConfiguration02, makeFakeChainHeight(2L));
-        chainHeights.put(rpcConfiguration03, makeFakeChainHeight(2L));
+        final List<RpcConfiguration> rpcConfigurations = new ImmutableList<>(rpcConfiguration01, rpcConfiguration02, rpcConfiguration03);
+        rpcConfiguration01.setChainHeight(makeFakeChainHeight(1L)); // Configuration is behind.
+        rpcConfiguration02.setChainHeight(makeFakeChainHeight(2L));
+        rpcConfiguration03.setChainHeight(makeFakeChainHeight(2L));
 
-        final NodeSelector nodeSelector = new HashMapNodeSelector(chainHeights);
+        final NodeSelector nodeSelector = new HashMapNodeSelector(rpcConfigurations);
 
         // Action
         final RpcConfiguration rpcConfiguration = nodeSelector.selectBestNode();

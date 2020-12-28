@@ -11,6 +11,8 @@ public class RpcConfiguration {
     protected final BitcoinRpcConnector _bitcoinRpcConnector;
     protected final Integer _hierarchy;
 
+    protected ChainHeight _chainHeight = ChainHeight.UNKNOWN_CHAIN_HEIGHT;
+
     public RpcConfiguration(final String name, final BitcoinRpcConnector bitcoinRpcConnector) {
         this(name, bitcoinRpcConnector, null);
     }
@@ -43,6 +45,16 @@ public class RpcConfiguration {
 
     public Integer getPort() {
         return _bitcoinRpcConnector.getPort();
+    }
+
+    public ChainHeight getChainHeight() {
+        return _chainHeight;
+    }
+
+    public synchronized ChainHeight setChainHeight(final ChainHeight chainHeight) {
+        final ChainHeight oldChainHeight = _chainHeight;
+        _chainHeight = chainHeight;
+        return oldChainHeight;
     }
 
     @Override

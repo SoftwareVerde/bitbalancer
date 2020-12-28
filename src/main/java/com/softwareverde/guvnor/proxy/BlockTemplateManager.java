@@ -4,6 +4,7 @@ import com.softwareverde.bitcoin.server.database.BatchRunner;
 import com.softwareverde.bitcoin.util.Util;
 import com.softwareverde.constable.list.List;
 import com.softwareverde.guvnor.proxy.node.selector.NodeSelector;
+import com.softwareverde.guvnor.proxy.rpc.ChainHeight;
 import com.softwareverde.guvnor.proxy.rpc.RpcConfiguration;
 import com.softwareverde.guvnor.proxy.rpc.connector.BitcoinRpcConnector;
 import com.softwareverde.guvnor.proxy.rpc.connector.BlockTemplate;
@@ -26,6 +27,8 @@ public class BlockTemplateManager {
         final ConcurrentHashMap<RpcConfiguration, AtomicInteger> countOfValidBlockTemplates = new ConcurrentHashMap<>();
 
         final List<RpcConfiguration> rpcConfigurations = _nodeSelector.getNodes();
+
+        final ChainHeight bestChainHeight = _nodeSelector.getBestChainHeight();
 
         try {
             final BatchRunner<RpcConfiguration> batchRunner = new BatchRunner<>(1, true);
@@ -67,6 +70,13 @@ public class BlockTemplateManager {
 
                         final RpcConfiguration rpcConfigurationForValidation = rpcConfigurationsForValidation.get(0); // Workaround for non-specialization of BatchRunner of size 1.
                         final BitcoinRpcConnector bitcoinRpcConnectorForValidation = rpcConfigurationForValidation.getBitcoinRpcConnector();
+
+                        final ChainHeight chainHeight = rpcConfigurationForValidation.getChainHeight();
+                        final boolean isNodeBehind = (chainHeight.compareTo(bestChainHeight) < 0);
+                        if (isNodeBehind) {
+                            Logger.debug("Skipping template validation template from " + rpcConfigurationForTemplate + " with " + rpcConfigurationForValidation + "; node is behind on ChainHeight: " + chainHeight);
+                            return;
+                        }
 
                         nanoTimer.start();
                         final Boolean isValid = bitcoinRpcConnectorForValidation.validateBlockTemplate(blockTemplate);
@@ -138,6 +148,8 @@ public class BlockTemplateManager {
             return _onGetBlockTemplateFailure();
         }
 
+        final ChainHeight bestChainHeight = _nodeSelector.getBestChainHeight();
+
         final AtomicInteger validCount = new AtomicInteger(0);
         try {
             final BatchRunner<RpcConfiguration> batchRunner = new BatchRunner<>(1, true);
@@ -148,6 +160,13 @@ public class BlockTemplateManager {
 
                     final RpcConfiguration rpcConfiguration = rpcConfigurations.get(0); // Workaround for non-specialization of BatchRunner of size 1.
                     final BitcoinRpcConnector bitcoinRpcConnector = rpcConfiguration.getBitcoinRpcConnector();
+
+                    final ChainHeight chainHeight = rpcConfiguration.getChainHeight();
+                    final boolean isNodeBehind = (chainHeight.compareTo(bestChainHeight) < 0);
+                    if (isNodeBehind) {
+                        Logger.debug("Skipping template validation template from " + rpcConfiguration + " with " + bestRpcConfiguration + "; node is behind on ChainHeight: " + chainHeight);
+                        return;
+                    }
 
                     nanoTimer.start();
                     final Boolean isValid = bitcoinRpcConnector.validateBlockTemplate(blockTemplate);

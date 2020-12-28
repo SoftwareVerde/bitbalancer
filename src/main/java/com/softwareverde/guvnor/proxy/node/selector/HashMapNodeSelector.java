@@ -1,18 +1,14 @@
 package com.softwareverde.guvnor.proxy.node.selector;
 
 import com.softwareverde.constable.list.List;
-import com.softwareverde.constable.list.mutable.MutableList;
 import com.softwareverde.guvnor.proxy.NotificationType;
 import com.softwareverde.guvnor.proxy.rpc.ChainHeight;
 import com.softwareverde.guvnor.proxy.rpc.RpcConfiguration;
 import com.softwareverde.guvnor.proxy.rpc.connector.BitcoinRpcConnector;
 import com.softwareverde.logging.Logger;
 
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-
 public class HashMapNodeSelector implements NodeSelector {
-    protected final Map<RpcConfiguration, ChainHeight> _rpcConfigurations;
+    protected final List<RpcConfiguration> _rpcConfigurations;
 
     protected RpcConfiguration _selectBestRpcConfiguration() {
         return _selectBestRpcConfiguration(null, null);
@@ -31,8 +27,8 @@ public class HashMapNodeSelector implements NodeSelector {
         ChainHeight bestChainHeight = ChainHeight.UNKNOWN_CHAIN_HEIGHT;
         RpcConfiguration bestRpcConfiguration = null;
 
-        for (final RpcConfiguration rpcConfiguration : _rpcConfigurations.keySet()) {
-            final ChainHeight chainHeight = _rpcConfigurations.get(rpcConfiguration);
+        for (final RpcConfiguration rpcConfiguration : _rpcConfigurations) {
+            final ChainHeight chainHeight = rpcConfiguration.getChainHeight();
 
             if (requiredNotificationType != null) {
                 final BitcoinRpcConnector bitcoinRpcConnector = rpcConfiguration.getBitcoinRpcConnector();
@@ -58,12 +54,8 @@ public class HashMapNodeSelector implements NodeSelector {
         return bestRpcConfiguration;
     }
 
-    public HashMapNodeSelector() {
-        _rpcConfigurations = new ConcurrentHashMap<>();
-    }
-
-    public HashMapNodeSelector(final Map<RpcConfiguration, ChainHeight> rpcConfigurations) {
-        _rpcConfigurations = rpcConfigurations;
+    public HashMapNodeSelector(final List<RpcConfiguration> rpcConfigurations) {
+        _rpcConfigurations = rpcConfigurations.asConst();
     }
 
     @Override
@@ -74,7 +66,7 @@ public class HashMapNodeSelector implements NodeSelector {
             return null;
         }
 
-        final ChainHeight bestChainHeight = _rpcConfigurations.get(bestRpcConfiguration);
+        final ChainHeight bestChainHeight = bestRpcConfiguration.getChainHeight();
         Logger.debug("Selected: " + bestRpcConfiguration + " " + bestChainHeight);
         return bestRpcConfiguration;
     }
@@ -87,7 +79,7 @@ public class HashMapNodeSelector implements NodeSelector {
             return null;
         }
 
-        final ChainHeight bestChainHeight = _rpcConfigurations.get(bestRpcConfiguration);
+        final ChainHeight bestChainHeight = bestRpcConfiguration.getChainHeight();
         Logger.debug("Selected: " + bestRpcConfiguration + " " + bestChainHeight);
         return bestRpcConfiguration;
     }
@@ -99,6 +91,19 @@ public class HashMapNodeSelector implements NodeSelector {
 
     @Override
     public List<RpcConfiguration> getNodes() {
-        return new MutableList<>(_rpcConfigurations.keySet());
+        return _rpcConfigurations;
+    }
+
+    @Override
+    public ChainHeight getBestChainHeight() {
+        ChainHeight bestChainHeight = ChainHeight.UNKNOWN_CHAIN_HEIGHT;
+        for (final RpcConfiguration rpcConfiguration : _rpcConfigurations) {
+            final ChainHeight chainHeight = rpcConfiguration.getChainHeight();
+            final boolean isBetterChainHeight = (bestChainHeight.compareTo(chainHeight) < 0);
+            if (isBetterChainHeight) {
+                bestChainHeight = chainHeight;
+            }
+        }
+        return bestChainHeight;
     }
 }
