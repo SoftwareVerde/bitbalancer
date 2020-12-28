@@ -72,7 +72,7 @@ public class BlockTemplateManager {
                         final BitcoinRpcConnector bitcoinRpcConnectorForValidation = rpcConfigurationForValidation.getBitcoinRpcConnector();
 
                         final ChainHeight chainHeight = rpcConfigurationForValidation.getChainHeight();
-                        final boolean isNodeBehind = (chainHeight.compareTo(bestChainHeight) < 0);
+                        final boolean isNodeBehind = bestChainHeight.isBetterThan(chainHeight);
                         if (isNodeBehind) {
                             Logger.debug("Skipping template validation template from " + rpcConfigurationForTemplate + " with " + rpcConfigurationForValidation + "; node is behind on ChainHeight: " + chainHeight);
                             return;
@@ -162,7 +162,7 @@ public class BlockTemplateManager {
                     final BitcoinRpcConnector bitcoinRpcConnector = rpcConfiguration.getBitcoinRpcConnector();
 
                     final ChainHeight chainHeight = rpcConfiguration.getChainHeight();
-                    final boolean isNodeBehind = (chainHeight.compareTo(bestChainHeight) < 0);
+                    final boolean isNodeBehind = bestChainHeight.isBetterThan(chainHeight);
                     if (isNodeBehind) {
                         Logger.debug("Skipping template validation template from " + rpcConfiguration + " with " + bestRpcConfiguration + "; node is behind on ChainHeight: " + chainHeight);
                         return;

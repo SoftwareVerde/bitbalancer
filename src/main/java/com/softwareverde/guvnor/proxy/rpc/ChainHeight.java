@@ -66,6 +66,10 @@ public class ChainHeight implements Comparable<ChainHeight> {
         return _chainWork;
     }
 
+    public Boolean isBetterThan(final ChainHeight chainHeight) {
+        return (COMPARATOR.compare(this, chainHeight) > 0);
+    }
+
     @Override
     public boolean equals(final Object object) {
         if (! (object instanceof ChainHeight)) { return false; }

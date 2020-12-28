@@ -36,11 +36,13 @@ public class HashMapNodeSelector implements NodeSelector {
                 if (! hasNotificationType) { continue; }
             }
 
-            final int compareValue = chainHeight.compareTo(bestChainHeight);
-            if (compareValue < 0) { continue; }
+            final boolean isBetterChainHeight = chainHeight.isBetterThan(bestChainHeight);
+            final boolean areEqualChainHeights = chainHeight.equals(bestChainHeight);
+            final boolean isLesserChainHeight = (! isBetterChainHeight) && (! areEqualChainHeights);
+            if (isLesserChainHeight) { continue; }
 
             final int hierarchy = rpcConfiguration.getHierarchy();
-            if ( (compareValue > 0) || (hierarchy <= bestHierarchy) ) {
+            if ( isBetterChainHeight || (areEqualChainHeights && (hierarchy <= bestHierarchy)) ) {
                 if ( (excludedConfigurations != null) && excludedConfigurations.contains(rpcConfiguration) ) {
                     continue;
                 }
@@ -99,7 +101,7 @@ public class HashMapNodeSelector implements NodeSelector {
         ChainHeight bestChainHeight = ChainHeight.UNKNOWN_CHAIN_HEIGHT;
         for (final RpcConfiguration rpcConfiguration : _rpcConfigurations) {
             final ChainHeight chainHeight = rpcConfiguration.getChainHeight();
-            final boolean isBetterChainHeight = (bestChainHeight.compareTo(chainHeight) < 0);
+            final boolean isBetterChainHeight = chainHeight.isBetterThan(bestChainHeight);
             if (isBetterChainHeight) {
                 bestChainHeight = chainHeight;
             }

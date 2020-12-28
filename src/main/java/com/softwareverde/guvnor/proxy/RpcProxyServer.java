@@ -48,9 +48,9 @@ public class RpcProxyServer {
     protected void _updateChainHeights(final ChainHeight bestChainHeight) {
         for (final RpcConfiguration rpcConfiguration : _rpcConfigurations) {
             final ChainHeight chainHeight = rpcConfiguration.getChainHeight();
-            final BitcoinRpcConnector bitcoinRpcConnector = rpcConfiguration.getBitcoinRpcConnector();
 
-            if (bestChainHeight.compareTo(chainHeight) > 0) {
+            if (bestChainHeight.isBetterThan(chainHeight)) {
+                final BitcoinRpcConnector bitcoinRpcConnector = rpcConfiguration.getBitcoinRpcConnector();
                 final ChainHeight newChainHeight = bitcoinRpcConnector.getChainHeight();
                 if (newChainHeight != null) {
                     Logger.debug("Updating chainHeight for " + rpcConfiguration + ": " + newChainHeight);
@@ -98,7 +98,7 @@ public class RpcProxyServer {
                         Logger.debug("Updating chainHeight for " + rpcConfiguration + ": " + chainHeight);
                         final ChainHeight oldChainHeight = rpcConfiguration.setChainHeight(chainHeight);
 
-                        if (chainHeight.compareTo(oldChainHeight) > 0) {
+                        if (chainHeight.isBetterThan(oldChainHeight)) {
                             if (_blockTemplateManager instanceof CachingBlockTemplateManager) {
                                 ((CachingBlockTemplateManager) _blockTemplateManager).onNewBlock(blockHeader, chainHeight);
                             }
@@ -247,10 +247,10 @@ public class RpcProxyServer {
                 for (final RpcConfiguration rpcConfiguration : _rpcConfigurations) {
                     final ChainHeight chainHeight = rpcConfiguration.getChainHeight();
 
-                    if (bestChainHeight.compareTo(chainHeight) > 0) {
+                    if (bestChainHeight.isBetterThan(chainHeight)) {
                         final BitcoinRpcConnector bitcoinRpcConnector = rpcConfiguration.getBitcoinRpcConnector();
                         final ChainHeight newChainHeight = bitcoinRpcConnector.getChainHeight();
-                        if ( (newChainHeight != null) && (newChainHeight.compareTo(chainHeight) > 0) ) {
+                        if ( (newChainHeight != null) && newChainHeight.isBetterThan(chainHeight) ) {
                             Logger.debug("Updating chainHeight for " + rpcConfiguration + ": " + newChainHeight);
                             rpcConfiguration.setChainHeight(newChainHeight);
                         }
