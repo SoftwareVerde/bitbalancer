@@ -6,11 +6,11 @@ import com.softwareverde.util.timer.NanoTimer;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public abstract class RpcMonitor<T> implements Monitor {
-    protected final NanoTimer _timer = new NanoTimer();
-    protected final AtomicBoolean _isComplete = new AtomicBoolean(false);
-    protected final Thread _cancelThread;
-    protected volatile Long _maxDurationMs = null;
-    protected T _connection;
+    private final NanoTimer _timer = new NanoTimer();
+    private final AtomicBoolean _isComplete = new AtomicBoolean(false);
+    private final AtomicBoolean _threadHasStarted = new AtomicBoolean(false);
+    private final Thread _cancelThread;
+    private volatile Long _maxDurationMs = null;
 
     private Long _getDurationMs() {
         if (! _isComplete.get()) {
@@ -21,6 +21,24 @@ public abstract class RpcMonitor<T> implements Monitor {
         return msElapsed.longValue();
     }
 
+    private void _startCancelThread() {
+        final boolean isFirstInvocation = _threadHasStarted.compareAndSet(false, true);
+        if (! isFirstInvocation) { return; }
+
+        _cancelThread.start();
+    }
+
+    private void _stopCancelThread() {
+        if (! _threadHasStarted.get()) { return; }
+        _cancelThread.interrupt();
+
+        try {
+            _cancelThread.join();
+        }
+        catch (final Exception exception) { }
+    }
+
+    protected T _connection;
     protected abstract void _cancelRequest();
 
     public RpcMonitor() {
@@ -29,7 +47,7 @@ public abstract class RpcMonitor<T> implements Monitor {
             public void run() {
                 boolean maxDurationReached = false;
                 try {
-                    while ( (!_cancelThread.isInterrupted()) && (! maxDurationReached) && (! _isComplete.get()) ) {
+                    while ( (! _cancelThread.isInterrupted()) && (! maxDurationReached) && (! _isComplete.get()) ) {
                         Thread.sleep(100L);
 
                         final long duration = _getDurationMs();
@@ -49,14 +67,24 @@ public abstract class RpcMonitor<T> implements Monitor {
         });
     }
 
+    /**
+     * Caller must always invoke afterRequestEnd if beforeRequestStart is invoked.
+     */
     void beforeRequestStart(final T connection) {
         _connection = connection;
         _timer.start();
+
+        _startCancelThread();
     }
 
+    /**
+     * Must always be called if beforeRequestStart is invoked.
+     */
     void afterRequestEnd() {
         _isComplete.set(true);
         _timer.stop();
+
+        _stopCancelThread();
     }
 
     @Override
@@ -72,16 +100,16 @@ public abstract class RpcMonitor<T> implements Monitor {
     @Override
     public void setMaxDurationMs(final Long maxDurationMs) {
         if (_isComplete.get()) { return; }
-        final boolean threadHasBeenStarted = (_maxDurationMs != null);
         _maxDurationMs = maxDurationMs;
-
-        if (! threadHasBeenStarted) {
-            _cancelThread.start();
-        }
     }
 
     @Override
     public void cancel() {
+        _isComplete.set(true);
+        _timer.stop();
+
+        _stopCancelThread();
+
         final T connection = _connection;
         if (connection == null) { return; }
 
