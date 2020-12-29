@@ -92,7 +92,6 @@ public class NodeSelectorTests {
     @Test
     public void should_select_other_node_when_preferred_node_is_behind() {
         // Setup
-
         final RpcConfiguration rpcConfiguration01 = new RpcConfiguration(
             "host-01",
             new FakeBitcoinRpcConnector("host-01"),
@@ -123,5 +122,47 @@ public class NodeSelectorTests {
 
         // Assert
         Assert.assertNotEquals(rpcConfiguration01, rpcConfiguration);
+    }
+
+    @Test
+    public void should_select_other_node_when_preferred_node_is_behind_with_production_values() {
+        // Setup
+        final RpcConfiguration verde01 = new RpcConfiguration(
+            "verde-01",
+            new FakeBitcoinRpcConnector("verde-01"),
+            0
+        );
+
+        final RpcConfiguration verde02 = new RpcConfiguration(
+            "verde-02",
+            new FakeBitcoinRpcConnector("verde-02"),
+            1
+        );
+
+        final RpcConfiguration bchn01 = new RpcConfiguration(
+            "bchn-01",
+            new FakeBitcoinRpcConnector("bchn-01"),
+            2
+        );
+
+        final RpcConfiguration bitcoinUnlimited01 = new RpcConfiguration(
+            "bitcoin-unlimited-01",
+            new FakeBitcoinRpcConnector("bitcoin-unlimited-01"),
+            3
+        );
+
+        final List<RpcConfiguration> rpcConfigurations = new ImmutableList<>(verde01, verde02, bchn01, bitcoinUnlimited01);
+        verde01.setChainHeight(new ChainHeight(667855L, ChainWork.fromHexString("00000000000000000000000000000000000000000158CEB0A0DFAA0B3411D4DA")));
+        verde02.setChainHeight(new ChainHeight(667855L, ChainWork.fromHexString("00000000000000000000000000000000000000000158CEB0A0DFAA0B3411D4DA")));
+        bchn01.setChainHeight(new ChainHeight(667855L, ChainWork.fromHexString("00000000000000000000000000000000000000000158CEB0A0DFAA0B3411D4DA")));
+        bitcoinUnlimited01.setChainHeight(new ChainHeight(667854L, ChainWork.fromHexString("00000000000000000000000000000000000000000158CE7A2EA55FF4C8ACA055")));
+
+        final NodeSelector nodeSelector = new HashMapNodeSelector(rpcConfigurations);
+
+        // Action
+        final RpcConfiguration rpcConfiguration = nodeSelector.selectBestNode();
+
+        // Assert
+        Assert.assertNotEquals(bitcoinUnlimited01, rpcConfiguration);
     }
 }

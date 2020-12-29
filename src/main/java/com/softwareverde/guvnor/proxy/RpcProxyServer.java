@@ -52,7 +52,7 @@ public class RpcProxyServer {
             if (bestChainHeight.isBetterThan(chainHeight)) {
                 final BitcoinRpcConnector bitcoinRpcConnector = rpcConfiguration.getBitcoinRpcConnector();
                 final ChainHeight newChainHeight = bitcoinRpcConnector.getChainHeight();
-                if (newChainHeight != null) {
+                if ( (newChainHeight != null) && newChainHeight.isBetterThan(chainHeight) ) {
                     Logger.debug("Updating chainHeight for " + rpcConfiguration + ": " + newChainHeight);
                     rpcConfiguration.setChainHeight(newChainHeight);
                 }
@@ -95,15 +95,17 @@ public class RpcProxyServer {
                     final BitcoinRpcConnector bitcoinRpcConnector = rpcConfiguration.getBitcoinRpcConnector();
                     final ChainHeight chainHeight = bitcoinRpcConnector.getChainHeight();
                     if (chainHeight != null) {
-                        Logger.debug("Updating chainHeight for " + rpcConfiguration + ": " + chainHeight);
-                        final ChainHeight oldChainHeight = rpcConfiguration.setChainHeight(chainHeight);
+                        final ChainHeight previousBestChainHeight = _nodeSelector.getBestChainHeight();
 
-                        if (chainHeight.isBetterThan(oldChainHeight)) {
+                        Logger.debug("Updating chainHeight for " + rpcConfiguration + ": " + chainHeight);
+                        rpcConfiguration.setChainHeight(chainHeight);
+
+                        if (chainHeight.isBetterThan(previousBestChainHeight)) {
                             if (_blockTemplateManager instanceof CachingBlockTemplateManager) {
                                 ((CachingBlockTemplateManager) _blockTemplateManager).onNewBlock(blockHeader, chainHeight);
                             }
 
-                            Logger.debug("New best block detected. Refreshing all nodes' chainHeights.");
+                            Logger.debug("New best block detected (" + chainHeight + "). Refreshing all nodes' chainHeights.");
                             _updateChainHeights(chainHeight);
                         }
                     }

@@ -1,6 +1,7 @@
 package com.softwareverde.guvnor.proxy.rpc;
 
 import com.softwareverde.bitcoin.block.header.difficulty.work.ChainWork;
+import com.softwareverde.bitcoin.util.ByteUtil;
 import com.softwareverde.cryptography.hash.sha256.Sha256Hash;
 import com.softwareverde.util.Util;
 
@@ -16,7 +17,7 @@ public class ChainHeight implements Comparable<ChainHeight> {
                 final byte b0 = chainWork0.getByte(i);
                 final byte b1 = chainWork1.getByte(i);
 
-                final int byteCompare = Byte.compare(b0, b1);
+                final int byteCompare = ByteUtil.compare(b0, b1);
                 if (byteCompare == 0) { continue; }
 
                 return byteCompare;
@@ -37,13 +38,11 @@ public class ChainHeight implements Comparable<ChainHeight> {
 
             // If either ChainWorks are null then fallback to blockHeight.
             //  This can happen with nodes that do now expose their ChainWork (i.e. BCHD as of 20201209).
-            if ( (chainWork0 == null) || (chainWork1 == null) ) {
-                return blockHeight0.compareTo(blockHeight1);
+            if ( (chainWork0 != null) && (chainWork1 != null) ) {
+                // If both ChainWorks are provided, then disregard blockHeight and only consider the best ChainWork.
+                final int chainWorkComparison = CHAIN_WORK_COMPARATOR.compare(chainWork0, chainWork1);
+                if (chainWorkComparison != 0) { return chainWorkComparison; }
             }
-
-            // If both ChainWorks are provided, then disregard blockHeight and only consider the best ChainWork.
-            final int chainWorkComparison = CHAIN_WORK_COMPARATOR.compare(chainWork0, chainWork1);
-            if (chainWorkComparison != 0) { return chainWorkComparison; }
 
             // If both chainWorks are equal, then defer to the blockHeight (which are likely to be equal).
             return blockHeight0.compareTo(blockHeight1);

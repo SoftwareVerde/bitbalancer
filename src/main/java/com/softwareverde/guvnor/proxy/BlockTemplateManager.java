@@ -32,6 +32,8 @@ public class BlockTemplateManager {
 
         try {
             final BatchRunner<RpcConfiguration> batchRunner = new BatchRunner<>(1, true);
+
+            // Get block templates from each of the nodes...
             batchRunner.run(rpcConfigurations, new BatchRunner.Batch<RpcConfiguration>() {
                 @Override
                 public void run(final List<RpcConfiguration> rpcConfigurations) {
@@ -39,6 +41,8 @@ public class BlockTemplateManager {
 
                     final NanoTimer nanoTimer = new NanoTimer();
                     final BitcoinRpcConnector bitcoinRpcConnector = rpcConfiguration.getBitcoinRpcConnector();
+
+                    // TODO: BitcoinRpcConnector::getBlockTemplate should abort if the duration exceeds double the execution time of half of the other requests.
 
                     nanoTimer.start();
                     final BlockTemplate blockTemplate = bitcoinRpcConnector.getBlockTemplate();
@@ -54,11 +58,12 @@ public class BlockTemplateManager {
                         Logger.debug("Failed to obtain template from " + rpcConfiguration + " in " + nanoTimer.getMillisecondsElapsed() + "ms.");
                     }
                     else {
-                        Logger.info("Obtained template from " + rpcConfiguration + " in " + nanoTimer.getMillisecondsElapsed() + "ms.");
+                        Logger.info("Obtained template (height=" + blockTemplate.getBlockHeight() + ") from " + rpcConfiguration + " in " + nanoTimer.getMillisecondsElapsed() + "ms.");
                     }
                 }
             });
 
+            // Validate each of the templates against each of the nodes...
             for (final RpcConfiguration rpcConfigurationForTemplate : rpcConfigurations) {
                 final BlockTemplate blockTemplate = blockTemplates.get(rpcConfigurationForTemplate);
                 if (blockTemplate == null) { continue; }
@@ -141,7 +146,6 @@ public class BlockTemplateManager {
 
         Logger.info("Block template acquired in " + nanoTimer.getMillisecondsElapsed() + "ms.");
 
-        final int nodeCount = rpcConfigurations.getCount();
         final Container<String> errorStringContainer = new Container<>();
         if (blockTemplate == null) {
             Logger.warn("Unable to get block template from " + bestRpcConfiguration + ": " + errorStringContainer.value);
@@ -150,6 +154,8 @@ public class BlockTemplateManager {
 
         final ChainHeight bestChainHeight = _nodeSelector.getBestChainHeight();
 
+        final AtomicInteger invalidCount = new AtomicInteger(0);
+        final AtomicInteger skipCount = new AtomicInteger(0);
         final AtomicInteger validCount = new AtomicInteger(0);
         try {
             final BatchRunner<RpcConfiguration> batchRunner = new BatchRunner<>(1, true);
@@ -164,7 +170,8 @@ public class BlockTemplateManager {
                     final ChainHeight chainHeight = rpcConfiguration.getChainHeight();
                     final boolean isNodeBehind = bestChainHeight.isBetterThan(chainHeight);
                     if (isNodeBehind) {
-                        Logger.debug("Skipping template validation template from " + rpcConfiguration + " with " + bestRpcConfiguration + "; node is behind on ChainHeight: " + chainHeight);
+                        Logger.debug("Skipping template validation template for " + rpcConfiguration + " with " + bestRpcConfiguration + " template; node is behind on ChainHeight: " + chainHeight);
+                        skipCount.incrementAndGet();
                         return;
                     }
 
@@ -172,19 +179,20 @@ public class BlockTemplateManager {
                     final Boolean isValid = bitcoinRpcConnector.validateBlockTemplate(blockTemplate);
                     nanoTimer.stop();
 
-                    if (isValid != null) {
-                        Logger.debug("Validated template from " + bestRpcConfiguration + " with " + rpcConfiguration + " in " + nanoTimer.getMillisecondsElapsed() + "ms. (" + (isValid ? "VALID" : "INVALID") + ")");
-                    }
-                    else {
+                    if (isValid == null) {
                         Logger.debug("Template validation not supported by " + rpcConfiguration + ".");
+                        skipCount.incrementAndGet();
+                        return;
                     }
 
-                    if (Util.coalesce(isValid, true)) {
-                        validCount.incrementAndGet();
+                    if (! isValid) {
+                        Logger.debug("Template considered invalid by: " + rpcConfiguration + " in " + nanoTimer.getMillisecondsElapsed() + "ms.");
+                        invalidCount.incrementAndGet();
+                        return;
                     }
-                    else {
-                        Logger.debug("Template considered invalid by: " + rpcConfiguration);
-                    }
+
+                    Logger.debug("Validated template from " + bestRpcConfiguration + " with " + rpcConfiguration + " in " + nanoTimer.getMillisecondsElapsed() + "ms.");
+                    validCount.incrementAndGet();
                 }
             });
         }
@@ -193,9 +201,8 @@ public class BlockTemplateManager {
         }
 
         final Long blockHeight = blockTemplate.getBlockHeight();
-        final int invalidCount = (nodeCount - validCount.get());
-        if (invalidCount > 0) {
-            Logger.warn("Block template for height " + blockHeight + " considered invalid by " + invalidCount + " nodes.");
+        if (invalidCount.get() > 0) {
+            Logger.warn("Block template for height " + blockHeight + " considered invalid by " + invalidCount.get() + " nodes.");
             return _onGetBlockTemplateFailure();
         }
 

@@ -51,10 +51,8 @@ public class RpcConfiguration {
         return _chainHeight;
     }
 
-    public synchronized ChainHeight setChainHeight(final ChainHeight chainHeight) {
-        final ChainHeight oldChainHeight = _chainHeight;
+    public void setChainHeight(final ChainHeight chainHeight) {
         _chainHeight = chainHeight;
-        return oldChainHeight;
     }
 
     @Override

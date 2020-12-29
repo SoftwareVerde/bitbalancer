@@ -22,7 +22,7 @@ dependencies {
     implementation (group: 'com.github.softwareverde',  name: 'java-http-client',       version: 'v2.0.6', force: true)
     implementation  group: 'com.github.softwareverde',  name: 'java-cryptography',      version: 'v3.0.0'
     implementation  group: 'com.github.softwareverde',  name: 'java-db',                version: 'v3.2.5' // for DatabaseException
-    implementation  group: 'com.github.softwareverde',  name: 'bitcoin-verde',          version: 'bbb0f42c'
+    implementation  group: 'com.github.softwareverde',  name: 'bitcoin-verde',          version: 'c314216b'
     implementation  group: 'org.zeromq',                name: 'jeromq',                 version: '0.5.2'
 
     testImplementation 'junit:junit:4.12'

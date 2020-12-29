@@ -23,7 +23,7 @@ public class HashMapNodeSelector implements NodeSelector {
     }
 
     protected RpcConfiguration _selectBestRpcConfiguration(final NotificationType requiredNotificationType, final List<RpcConfiguration> excludedConfigurations) {
-        int bestHierarchy = Integer.MIN_VALUE;
+        int bestHierarchy = Integer.MAX_VALUE;
         ChainHeight bestChainHeight = ChainHeight.UNKNOWN_CHAIN_HEIGHT;
         RpcConfiguration bestRpcConfiguration = null;
 
