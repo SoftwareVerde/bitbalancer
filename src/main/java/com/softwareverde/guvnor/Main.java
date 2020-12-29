@@ -41,6 +41,7 @@ public class Main {
         Logger.setLogLevel("com.softwareverde.network", LogLevel.WARN);
         Logger.setLogLevel("com.softwareverde.util", LogLevel.WARN);
         Logger.setLogLevel("com.softwareverde.json", LogLevel.ERROR);
+        Logger.setLogLevel("com.softwareverde.http", LogLevel.WARN);
 
         if (arguments.length != 1) {
             System.err.println("Missing Argument: <configuration>");
@@ -63,6 +64,7 @@ public class Main {
                 final String name = nodeProperties.getName();
                 final String host = nodeProperties.getHost();
                 final Integer port = nodeProperties.getPort();
+                final Long maxTimeoutMs = nodeProperties.getMaxTimeoutMs();
                 final BitcoinNodeAddress bitcoinNodeAddress = new BitcoinNodeAddress(host, port, nodeProperties.isSecure());
                 final RpcCredentials rpcCredentials = new RpcCredentials(nodeProperties.getRpcUsername(), nodeProperties.getRpcPassword());
                 final BitcoinRpcConnector bitcoinRpcConnector;
@@ -89,7 +91,7 @@ public class Main {
                         } break;
                     }
                 }
-                final RpcConfiguration rpcConfiguration = new RpcConfiguration(name, bitcoinRpcConnector, preferenceOrder);
+                final RpcConfiguration rpcConfiguration = new RpcConfiguration(name, bitcoinRpcConnector, preferenceOrder, maxTimeoutMs);
 
                 rpcConfigurations.add(rpcConfiguration);
                 Logger.info("Added endpoint: " + preferenceOrder + "=" + host + ":" + port + " (" + name + ")");

@@ -6,6 +6,7 @@
       "name": "node-00",
       "host": "",
       "port": 8332,
+      "maxTimeoutMs": null,
       "isSecure": false,
       "rpcUsername": "",
       "rpcPassword": "",

@@ -31,22 +31,39 @@ public class FakeBitcoinRpcConnector implements BitcoinRpcConnector {
     }
 
     @Override
-    public Response handleRequest(final Request request) {
+    public Monitor getMonitor() {
+        return new Monitor() {
+            @Override
+            public Boolean isComplete() { return true; }
+
+            @Override
+            public Long getDurationMs() { return 0L; }
+
+            @Override
+            public void setMaxDurationMs(final Long maxDurationMs) { }
+
+            @Override
+            public void cancel() { }
+        };
+    }
+
+    @Override
+    public Response handleRequest(final Request request, final Monitor monitor) {
         return null;
     }
 
     @Override
-    public ChainHeight getChainHeight() {
+    public ChainHeight getChainHeight(final Monitor monitor) {
         return _chainHeight;
     }
 
     @Override
-    public BlockTemplate getBlockTemplate() {
+    public BlockTemplate getBlockTemplate(final Monitor monitor) {
         return null;
     }
 
     @Override
-    public Boolean validateBlockTemplate(final BlockTemplate blockTemplate) {
+    public Boolean validateBlockTemplate(final BlockTemplate blockTemplate, final Monitor monitor) {
         return null;
     }
 

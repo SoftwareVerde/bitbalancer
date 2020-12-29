@@ -107,7 +107,12 @@ public class BitcoinVerdeRpcConnector implements BitcoinRpcConnector {
     }
 
     @Override
-    public Response handleRequest(final Request request) {
+    public Monitor getMonitor() {
+        return new BitcoinVerdeRpcMonitor();
+    }
+
+    @Override
+    public Response handleRequest(final Request request, final Monitor monitor) {
         final String rawPostData = StringUtil.bytesToString(request.getRawPostData());
         final Json requestJson = Json.parse(rawPostData);
 
@@ -117,20 +122,31 @@ public class BitcoinVerdeRpcConnector implements BitcoinRpcConnector {
         final String host = _bitcoinNodeAddress.getHost();
         final Integer port = _bitcoinNodeAddress.getPort();
         try (final NodeJsonRpcConnection nodeJsonRpcConnection = new NodeJsonRpcConnection(host, port, _threadPool)) {
-            switch (query) {
-                default: {
-                    Logger.debug("Unsupported command: " + query);
-                    final Response response = new Response();
-                    response.setCode(Response.Codes.BAD_REQUEST);
-                    response.setContent("Unsupported method: " + query);
-                    return response;
+            if (monitor instanceof BitcoinVerdeRpcMonitor) {
+                ((BitcoinVerdeRpcMonitor) monitor).beforeRequestStart(nodeJsonRpcConnection);
+            }
+
+            try {
+                switch (query) {
+                    default: {
+                        Logger.debug("Unsupported command: " + query);
+                        final Response response = new Response();
+                        response.setCode(Response.Codes.BAD_REQUEST);
+                        response.setContent("Unsupported method: " + query);
+                        return response;
+                    }
+                }
+            }
+            finally {
+                if (monitor instanceof BitcoinVerdeRpcMonitor) {
+                    ((BitcoinVerdeRpcMonitor) monitor).afterRequestEnd();
                 }
             }
         }
     }
 
     @Override
-    public ChainHeight getChainHeight() {
+    public ChainHeight getChainHeight(final Monitor monitor) {
         final String host = _bitcoinNodeAddress.getHost();
         final Integer port = _bitcoinNodeAddress.getPort();
 
@@ -162,7 +178,7 @@ public class BitcoinVerdeRpcConnector implements BitcoinRpcConnector {
     }
 
     @Override
-    public BlockTemplate getBlockTemplate() {
+    public BlockTemplate getBlockTemplate(final Monitor monitor) {
         final String host = _bitcoinNodeAddress.getHost();
         final Integer port = _bitcoinNodeAddress.getPort();
 
@@ -198,7 +214,7 @@ public class BitcoinVerdeRpcConnector implements BitcoinRpcConnector {
     }
 
     @Override
-    public Boolean validateBlockTemplate(final BlockTemplate blockTemplate) {
+    public Boolean validateBlockTemplate(final BlockTemplate blockTemplate, final Monitor monitor) {
         final String host = _bitcoinNodeAddress.getHost();
         final Integer port = _bitcoinNodeAddress.getPort();
 

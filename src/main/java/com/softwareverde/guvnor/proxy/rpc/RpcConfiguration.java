@@ -1,15 +1,13 @@
 package com.softwareverde.guvnor.proxy.rpc;
 
-import com.softwareverde.guvnor.proxy.NotificationType;
 import com.softwareverde.guvnor.proxy.rpc.connector.BitcoinRpcConnector;
 import com.softwareverde.util.Util;
-
-import java.util.Map;
 
 public class RpcConfiguration {
     protected final String _name;
     protected final BitcoinRpcConnector _bitcoinRpcConnector;
     protected final Integer _hierarchy;
+    protected final Long _maxTimeoutMs;
 
     protected ChainHeight _chainHeight = ChainHeight.UNKNOWN_CHAIN_HEIGHT;
 
@@ -21,10 +19,11 @@ public class RpcConfiguration {
         this(name, bitcoinRpcConnector, preferenceOrder, null);
     }
 
-    public RpcConfiguration(final String name, final BitcoinRpcConnector bitcoinRpcConnector, final Integer preferenceOrder, final Map<NotificationType, Integer> zmqPorts) {
+    public RpcConfiguration(final String name, final BitcoinRpcConnector bitcoinRpcConnector, final Integer preferenceOrder, final Long maxTimeoutMs) {
         _name = name;
         _bitcoinRpcConnector = bitcoinRpcConnector;
         _hierarchy = preferenceOrder;
+        _maxTimeoutMs = maxTimeoutMs;
     }
 
     public String getName() {
@@ -53,6 +52,10 @@ public class RpcConfiguration {
 
     public void setChainHeight(final ChainHeight chainHeight) {
         _chainHeight = chainHeight;
+    }
+
+    public Long getMaxTimeoutMs() {
+        return _maxTimeoutMs;
     }
 
     @Override

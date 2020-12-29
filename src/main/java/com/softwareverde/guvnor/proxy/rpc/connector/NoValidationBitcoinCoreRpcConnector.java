@@ -11,7 +11,12 @@ public class NoValidationBitcoinCoreRpcConnector extends BitcoinCoreRpcConnector
     }
 
     @Override
-    public Boolean validateBlockTemplate(final BlockTemplate blockTemplate) {
+    public Boolean validateBlockTemplate(final BlockTemplate blockTemplate, final Monitor monitor) {
+        if (monitor instanceof BitcoinCoreRpcMonitor) {
+            ((BitcoinCoreRpcMonitor) monitor).beforeRequestStart(null);
+            ((BitcoinCoreRpcMonitor) monitor).afterRequestEnd();
+        }
+
         return null;
     }
 }

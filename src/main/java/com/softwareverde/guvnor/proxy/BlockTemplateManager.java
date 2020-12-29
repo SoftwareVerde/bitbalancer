@@ -8,6 +8,7 @@ import com.softwareverde.guvnor.proxy.rpc.ChainHeight;
 import com.softwareverde.guvnor.proxy.rpc.RpcConfiguration;
 import com.softwareverde.guvnor.proxy.rpc.connector.BitcoinRpcConnector;
 import com.softwareverde.guvnor.proxy.rpc.connector.BlockTemplate;
+import com.softwareverde.guvnor.proxy.rpc.connector.Monitor;
 import com.softwareverde.logging.Logger;
 import com.softwareverde.util.Container;
 import com.softwareverde.util.timer.NanoTimer;
@@ -33,73 +34,77 @@ public class BlockTemplateManager {
         try {
             final BatchRunner<RpcConfiguration> batchRunner = new BatchRunner<>(1, true);
 
-            // Get block templates from each of the nodes...
-            batchRunner.run(rpcConfigurations, new BatchRunner.Batch<RpcConfiguration>() {
-                @Override
-                public void run(final List<RpcConfiguration> rpcConfigurations) {
-                    final RpcConfiguration rpcConfiguration = rpcConfigurations.get(0); // Workaround for non-specialization of BatchRunner of size 1.
-
-                    final NanoTimer nanoTimer = new NanoTimer();
-                    final BitcoinRpcConnector bitcoinRpcConnector = rpcConfiguration.getBitcoinRpcConnector();
-
-                    // TODO: BitcoinRpcConnector::getBlockTemplate should abort if the duration exceeds double the execution time of half of the other requests.
-
-                    nanoTimer.start();
-                    final BlockTemplate blockTemplate = bitcoinRpcConnector.getBlockTemplate();
-                    nanoTimer.stop();
-
-                    if (blockTemplate != null) {
-                        blockTemplates.put(rpcConfiguration, blockTemplate);
-                    }
-
-                    countOfValidBlockTemplates.put(rpcConfiguration, new AtomicInteger(0));
-
-                    if (blockTemplate == null) {
-                        Logger.debug("Failed to obtain template from " + rpcConfiguration + " in " + nanoTimer.getMillisecondsElapsed() + "ms.");
-                    }
-                    else {
-                        Logger.info("Obtained template (height=" + blockTemplate.getBlockHeight() + ") from " + rpcConfiguration + " in " + nanoTimer.getMillisecondsElapsed() + "ms.");
-                    }
-                }
-            });
-
-            // Validate each of the templates against each of the nodes...
-            for (final RpcConfiguration rpcConfigurationForTemplate : rpcConfigurations) {
-                final BlockTemplate blockTemplate = blockTemplates.get(rpcConfigurationForTemplate);
-                if (blockTemplate == null) { continue; }
-
+            { // Get block templates from each of the nodes...
                 batchRunner.run(rpcConfigurations, new BatchRunner.Batch<RpcConfiguration>() {
                     @Override
-                    public void run(final List<RpcConfiguration> rpcConfigurationsForValidation) {
-                        final NanoTimer nanoTimer = new NanoTimer();
+                    public void run(final List<RpcConfiguration> batch) {
+                        final RpcConfiguration rpcConfiguration = batch.get(0); // Workaround for non-specialization of BatchRunner of size 1.
+                        final BitcoinRpcConnector bitcoinRpcConnector = rpcConfiguration.getBitcoinRpcConnector();
 
-                        final RpcConfiguration rpcConfigurationForValidation = rpcConfigurationsForValidation.get(0); // Workaround for non-specialization of BatchRunner of size 1.
-                        final BitcoinRpcConnector bitcoinRpcConnectorForValidation = rpcConfigurationForValidation.getBitcoinRpcConnector();
-
-                        final ChainHeight chainHeight = rpcConfigurationForValidation.getChainHeight();
-                        final boolean isNodeBehind = bestChainHeight.isBetterThan(chainHeight);
-                        if (isNodeBehind) {
-                            Logger.debug("Skipping template validation template from " + rpcConfigurationForTemplate + " with " + rpcConfigurationForValidation + "; node is behind on ChainHeight: " + chainHeight);
-                            return;
+                        final Monitor monitor = bitcoinRpcConnector.getMonitor();
+                        final Long maxTimeoutMs = rpcConfiguration.getMaxTimeoutMs();
+                        if (maxTimeoutMs != null) {
+                            monitor.setMaxDurationMs(maxTimeoutMs);
                         }
 
-                        nanoTimer.start();
-                        final Boolean isValid = bitcoinRpcConnectorForValidation.validateBlockTemplate(blockTemplate);
-                        nanoTimer.stop();
+                        final BlockTemplate blockTemplate = bitcoinRpcConnector.getBlockTemplate(monitor);
 
-                        if (isValid != null) {
-                            Logger.debug("Validated template from " + rpcConfigurationForTemplate + " with " + rpcConfigurationForValidation + " in " + nanoTimer.getMillisecondsElapsed() + "ms. (" + (isValid ? "VALID" : "INVALID") + ")");
+                        if (blockTemplate != null) {
+                            blockTemplates.put(rpcConfiguration, blockTemplate);
+                        }
+
+                        countOfValidBlockTemplates.put(rpcConfiguration, new AtomicInteger(0));
+
+                        if (blockTemplate == null) {
+                            Logger.debug("Failed to obtain template from " + rpcConfiguration + " in " + monitor.getDurationMs() + "ms.");
                         }
                         else {
-                            Logger.debug("Template validation not supported by " + rpcConfigurationForValidation + ".");
-                        }
-
-                        if (Util.coalesce(isValid, true)) {
-                            final AtomicInteger currentIsValidCount = countOfValidBlockTemplates.get(rpcConfigurationForTemplate);
-                            currentIsValidCount.incrementAndGet();
+                            Logger.info("Obtained template (height=" + blockTemplate.getBlockHeight() + ") from " + rpcConfiguration + " in " + monitor.getDurationMs() + "ms.");
                         }
                     }
                 });
+            }
+
+            { // Validate each of the templates against each of the nodes...
+                for (final RpcConfiguration rpcConfigurationForTemplate : rpcConfigurations) {
+                    final BlockTemplate blockTemplate = blockTemplates.get(rpcConfigurationForTemplate);
+                    if (blockTemplate == null) { continue; }
+
+                    batchRunner.run(rpcConfigurations, new BatchRunner.Batch<RpcConfiguration>() {
+                        @Override
+                        public void run(final List<RpcConfiguration> batch) {
+                            final RpcConfiguration rpcConfigurationForValidation = batch.get(0); // Workaround for non-specialization of BatchRunner of size 1.
+                            final BitcoinRpcConnector bitcoinRpcConnectorForValidation = rpcConfigurationForValidation.getBitcoinRpcConnector();
+
+                            final Monitor monitor = bitcoinRpcConnectorForValidation.getMonitor();
+                            final Long maxTimeoutMs = rpcConfigurationForValidation.getMaxTimeoutMs();
+                            if (maxTimeoutMs != null) {
+                                monitor.setMaxDurationMs(maxTimeoutMs);
+                            }
+
+                            final ChainHeight chainHeight = rpcConfigurationForValidation.getChainHeight();
+                            final boolean isNodeBehind = bestChainHeight.isBetterThan(chainHeight);
+                            if (isNodeBehind) {
+                                Logger.debug("Skipping template validation template from " + rpcConfigurationForTemplate + " with " + rpcConfigurationForValidation + "; node is behind on ChainHeight: " + chainHeight);
+                                return;
+                            }
+
+                            final Boolean isValid = bitcoinRpcConnectorForValidation.validateBlockTemplate(blockTemplate, monitor);
+
+                            if (isValid != null) {
+                                Logger.debug("Validated template from " + rpcConfigurationForTemplate + " with " + rpcConfigurationForValidation + " in " + monitor.getDurationMs() + "ms. (" + (isValid ? "VALID" : "INVALID") + ")");
+                            }
+                            else {
+                                Logger.debug("Template validation not supported by " + rpcConfigurationForValidation + ".");
+                            }
+
+                            if (Util.coalesce(isValid, true)) {
+                                final AtomicInteger currentIsValidCount = countOfValidBlockTemplates.get(rpcConfigurationForTemplate);
+                                currentIsValidCount.incrementAndGet();
+                            }
+                        }
+                    });
+                }
             }
 
             for (final RpcConfiguration rpcConfiguration : rpcConfigurations) {
@@ -175,8 +180,14 @@ public class BlockTemplateManager {
                         return;
                     }
 
+                    final Monitor monitor = bitcoinRpcConnector.getMonitor();
+                    final Long maxTimeoutMs = rpcConfiguration.getMaxTimeoutMs();
+                    if (maxTimeoutMs != null) {
+                        monitor.setMaxDurationMs(maxTimeoutMs);
+                    }
+
                     nanoTimer.start();
-                    final Boolean isValid = bitcoinRpcConnector.validateBlockTemplate(blockTemplate);
+                    final Boolean isValid = bitcoinRpcConnector.validateBlockTemplate(blockTemplate, monitor);
                     nanoTimer.stop();
 
                     if (isValid == null) {

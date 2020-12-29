@@ -14,14 +14,16 @@ public class NodeProperties {
     protected final String _rpcPassword;
     protected final Map<NotificationType, Integer> _zmqPorts;
     protected final String _connectorIdentifier;
+    protected final Long _maxTimeoutMs;
 
-    public NodeProperties(final String name, final String host, final Integer port, final Boolean isSecure, final String rpcUsername, final String rpcPassword, final Map<NotificationType, Integer> zmqPorts, final String connectorIdentifier) {
+    public NodeProperties(final String name, final String host, final Integer port, final Boolean isSecure, final String rpcUsername, final String rpcPassword, final Map<NotificationType, Integer> zmqPorts, final String connectorIdentifier, final Long maxTimeoutMs) {
         _name = name;
         _host = host;
         _port = port;
         _isSecure = isSecure;
         _rpcUsername = rpcUsername;
         _rpcPassword = rpcPassword;
+        _maxTimeoutMs = maxTimeoutMs;
 
         if ( (zmqPorts != null) && (! zmqPorts.isEmpty()) ) {
             _zmqPorts = new HashMap<>(0);
@@ -62,5 +64,9 @@ public class NodeProperties {
 
     public String getConnectorIdentifier() {
         return _connectorIdentifier;
+    }
+
+    public Long getMaxTimeoutMs() {
+        return _maxTimeoutMs;
     }
 }

@@ -13,11 +13,28 @@ import com.softwareverde.util.StringUtil;
 public interface BitcoinRpcConnector {
     String getHost();
     Integer getPort();
-    Response handleRequest(Request request);
 
-    ChainHeight getChainHeight();
-    BlockTemplate getBlockTemplate();
-    Boolean validateBlockTemplate(BlockTemplate blockTemplate);
+    Monitor getMonitor();
+
+    Response handleRequest(Request request, Monitor monitor);
+
+    ChainHeight getChainHeight(Monitor monitor);
+    BlockTemplate getBlockTemplate(Monitor monitor);
+    Boolean validateBlockTemplate(BlockTemplate blockTemplate, Monitor monitor);
+
+    default Response handleRequest(Request request) {
+        return this.handleRequest(request, null);
+    }
+
+    default ChainHeight getChainHeight() {
+        return this.getChainHeight(null);
+    }
+    default BlockTemplate getBlockTemplate() {
+        return this.getBlockTemplate(null);
+    }
+    default Boolean validateBlockTemplate(BlockTemplate blockTemplate) {
+        return this.validateBlockTemplate(blockTemplate, null);
+    }
 
     Boolean supportsNotifications();
     Boolean supportsNotification(NotificationType notificationType);

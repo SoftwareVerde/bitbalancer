@@ -19,7 +19,7 @@ dependencies {
     implementation  group: 'com.github.softwareverde',  name: 'java-logging',           version: 'v2.2.0'
     implementation  group: 'com.github.softwareverde',  name: 'json',                   version: 'v2.0.0'
     implementation  group: 'com.github.softwareverde',  name: 'http-servlet',           version: 'v3.2.0'
-    implementation (group: 'com.github.softwareverde',  name: 'java-http-client',       version: 'v2.0.6', force: true)
+    implementation (group: 'com.github.softwareverde',  name: 'java-http-client',       version: 'v2.1.0', force: true)
     implementation  group: 'com.github.softwareverde',  name: 'java-cryptography',      version: 'v3.0.0'
     implementation  group: 'com.github.softwareverde',  name: 'java-db',                version: 'v3.2.5' // for DatabaseException
     implementation  group: 'com.github.softwareverde',  name: 'bitcoin-verde',          version: 'c314216b'

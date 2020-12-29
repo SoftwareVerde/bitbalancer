@@ -158,7 +158,12 @@ public class BitcoinCoreRpcConnector implements BitcoinRpcConnector {
     }
 
     @Override
-    public Response handleRequest(final Request request) {
+    public Monitor getMonitor() {
+        return new BitcoinCoreRpcMonitor();
+    }
+
+    @Override
+    public Response handleRequest(final Request request, final Monitor monitor) {
         final MutableByteArray rawPostData = MutableByteArray.wrap(request.getRawPostData());
 
         final Integer proxiedResponseCode;
@@ -188,7 +193,19 @@ public class BitcoinCoreRpcConnector implements BitcoinRpcConnector {
                 }
             }
 
-            final HttpResponse proxiedResponse = webRequest.execute();
+            if (monitor instanceof BitcoinCoreRpcMonitor) {
+                ((BitcoinCoreRpcMonitor) monitor).beforeRequestStart(webRequest);
+            }
+
+            final HttpResponse proxiedResponse;
+            try {
+                proxiedResponse = webRequest.execute();
+            }
+            finally {
+                if (monitor instanceof BitcoinCoreRpcMonitor) {
+                    ((BitcoinCoreRpcMonitor) monitor).afterRequestEnd();
+                }
+            }
 
             proxiedResponseCode = (proxiedResponse != null ? proxiedResponse.getResponseCode() : null);
             proxiedResult = (proxiedResponse != null ? proxiedResponse.getRawResult() : null);
@@ -206,7 +223,7 @@ public class BitcoinCoreRpcConnector implements BitcoinRpcConnector {
     }
 
     @Override
-    public ChainHeight getChainHeight() {
+    public ChainHeight getChainHeight(final Monitor monitor) {
         final byte[] requestPayload;
         { // Build request payload
             final Json json = new Json(false);
@@ -230,7 +247,7 @@ public class BitcoinCoreRpcConnector implements BitcoinRpcConnector {
 
         final Json resultJson;
         {
-            final Response response = this.handleRequest(request);
+            final Response response = this.handleRequest(request, monitor);
             final String rawResponse = StringUtil.bytesToString(response.getContent());
             if (! Json.isJson(rawResponse)) {
                 Logger.debug("Received error from " + _toString() +": " + rawResponse.replaceAll("[\\n\\r]+", "/"));
@@ -254,7 +271,7 @@ public class BitcoinCoreRpcConnector implements BitcoinRpcConnector {
     }
 
     @Override
-    public BlockTemplate getBlockTemplate() {
+    public BlockTemplate getBlockTemplate(final Monitor monitor) {
         final byte[] requestPayload;
         { // Build request payload
             final Json json = new Json(false);
@@ -275,7 +292,7 @@ public class BitcoinCoreRpcConnector implements BitcoinRpcConnector {
 
         final Json blockTemplateJson;
         {
-            final Response response = this.handleRequest(request);
+            final Response response = this.handleRequest(request, monitor);
             final String rawResponse = StringUtil.bytesToString(response.getContent());
             if (! Json.isJson(rawResponse)) {
                 Logger.debug("Received error from " + _toString() +": " + rawResponse.replaceAll("[\\n\\r]+", "/"));
@@ -340,7 +357,7 @@ public class BitcoinCoreRpcConnector implements BitcoinRpcConnector {
     }
 
     @Override
-    public Boolean validateBlockTemplate(final BlockTemplate blockTemplate) {
+    public Boolean validateBlockTemplate(final BlockTemplate blockTemplate, final Monitor monitor) {
         final byte[] requestPayload;
         { // Build request payload
             final Json json = new Json(false);
@@ -365,17 +382,15 @@ public class BitcoinCoreRpcConnector implements BitcoinRpcConnector {
         request.setMethod(HttpMethod.POST);
         request.setRawPostData(requestPayload);
 
-        final Boolean returnValueOnError = false;
-
-        final Response response = this.handleRequest(request);
+        final Response response = this.handleRequest(request, monitor);
         final String rawResponse = StringUtil.bytesToString(response.getContent());
         if (! Json.isJson(rawResponse)) {
             Logger.debug("Received error from " + _toString() +": " + rawResponse.replaceAll("[\\n\\r]+", "/"));
-            return returnValueOnError;
+            return false;
         }
 
         final Json responseJson = Json.parse(rawResponse);
-        return responseJson.get("result", returnValueOnError);
+        return responseJson.get("result", false);
     }
 
     @Override

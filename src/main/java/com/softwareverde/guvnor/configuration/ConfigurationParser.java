@@ -45,6 +45,7 @@ public class ConfigurationParser {
             final Boolean isSecure = nodeJson.get("isSecure", false);
             final String rpcUsername = nodeJson.getString("rpcUsername");
             final String rpcPassword = nodeJson.getString("rpcPassword");
+            final Long maxTimeoutMs = nodeJson.getLong("maxTimeoutMs");
 
             final Map<NotificationType, Integer> nodeZmqPorts;
             { // Parse Node ZMQ ports...
@@ -75,7 +76,7 @@ public class ConfigurationParser {
                 }
             }
 
-            final NodeProperties nodeProperties = new NodeProperties(name, host, port, isSecure, rpcUsername, rpcPassword, nodeZmqPorts, connectorIdentifier);
+            final NodeProperties nodeProperties = new NodeProperties(name, host, port, isSecure, rpcUsername, rpcPassword, nodeZmqPorts, connectorIdentifier, (maxTimeoutMs < 1L ? null : maxTimeoutMs));
             nodePropertiesList.add(nodeProperties);
         }
 
