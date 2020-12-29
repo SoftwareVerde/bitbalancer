@@ -46,6 +46,7 @@ public class RpcProxyServer {
      * Refreshes all nodes' chainHeights that fall below `bestChainHeight`.
      */
     protected void _updateChainHeights(final ChainHeight bestChainHeight) {
+        boolean chainHeightWasUpdated = false;
         for (final RpcConfiguration rpcConfiguration : _rpcConfigurations) {
             final ChainHeight chainHeight = rpcConfiguration.getChainHeight();
 
@@ -55,7 +56,16 @@ public class RpcProxyServer {
                 if ( (newChainHeight != null) && newChainHeight.isBetterThan(chainHeight) ) {
                     Logger.debug("Updating chainHeight for " + rpcConfiguration + ": " + newChainHeight);
                     rpcConfiguration.setChainHeight(newChainHeight);
+                    chainHeightWasUpdated = true;
                 }
+            }
+        }
+
+        if (chainHeightWasUpdated) {
+            // Refresh the block template after a ChainHeight update to ensure new nodes agree on the cached template.
+            if (_blockTemplateManager instanceof CachingBlockTemplateManager) {
+                Logger.debug("ChainHeight updated for at least one node; refreshing template.");
+                ((CachingBlockTemplateManager) _blockTemplateManager).updateBlockTemplate();
             }
         }
     }

@@ -26,7 +26,6 @@ public class CachingBlockTemplateManager extends BlockTemplateManager {
     protected final AtomicBoolean _getBlockTemplatePin = new AtomicBoolean(false);
     protected Thread _getBlockTemplateThread = null;
 
-    // TODO: validate cached template if skipped due to being behind when generated.
     protected BlockTemplate _cachedBlockTemplate = null;
 
     protected BlockHeader _currentHeadBlockHeader = null;
