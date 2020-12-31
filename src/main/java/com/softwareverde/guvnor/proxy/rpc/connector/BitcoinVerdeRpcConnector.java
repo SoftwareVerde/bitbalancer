@@ -93,7 +93,7 @@ public class BitcoinVerdeRpcConnector implements BitcoinRpcConnector {
         _bitcoinNodeAddress = bitcoinNodeAddress;
         _rpcCredentials = rpcCredentials;
 
-        _threadPool = new MainThreadPool(2, 5000L);
+        _threadPool = new MainThreadPool(32, 5000L);
     }
 
     @Override
