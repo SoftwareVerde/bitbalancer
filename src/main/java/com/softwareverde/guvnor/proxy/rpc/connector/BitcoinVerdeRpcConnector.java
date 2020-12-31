@@ -234,6 +234,23 @@ public class BitcoinVerdeRpcConnector implements BitcoinRpcConnector {
     }
 
     @Override
+    public Boolean submitBlock(final Block block, final Monitor monitor) {
+        final String host = _bitcoinNodeAddress.getHost();
+        final Integer port = _bitcoinNodeAddress.getPort();
+
+        final Json responseJson;
+        try (final NodeJsonRpcConnection nodeJsonRpcConnection = new NodeJsonRpcConnection(host, port, _threadPool)) {
+            responseJson = nodeJsonRpcConnection.submitBlock(block);
+        }
+        if (responseJson == null) {
+            Logger.warn("Unable to validate template block.");
+            return false;
+        }
+
+        return responseJson.getBoolean("wasSuccess");
+    }
+
+    @Override
     public Boolean supportsNotifications() {
         return true;
     }

@@ -394,6 +394,49 @@ public class BitcoinCoreRpcConnector implements BitcoinRpcConnector {
     }
 
     @Override
+    public Boolean submitBlock(final Block block, final Monitor monitor) {
+        final byte[] requestPayload;
+        { // Build request payload
+            final Json json = new Json(false);
+            json.put("id", _nextRequestId.getAndIncrement());
+            json.put("method", "submitblock");
+
+            { // Method Parameters
+                final BlockDeflater blockDeflater = new BlockDeflater();
+                final ByteArray blockData = blockDeflater.toBytes(block);
+                final String blockDataHexString = blockData.toString();
+
+                final Json paramsJson = new Json(true);
+                paramsJson.put("hexdata", blockDataHexString.toLowerCase());
+                // paramsJson.put("dummy", 0);
+                json.put("params", paramsJson);
+            }
+
+            requestPayload = StringUtil.stringToBytes(json.toString());
+        }
+
+        final MutableRequest request = new MutableRequest();
+        request.setMethod(HttpMethod.POST);
+        request.setRawPostData(requestPayload);
+
+        final Response response = this.handleRequest(request, monitor);
+        final String rawResponse = StringUtil.bytesToString(response.getContent());
+        if (! Json.isJson(rawResponse)) {
+            Logger.debug("Received error from " + _toString() +": " + rawResponse.replaceAll("[\\n\\r]+", "/"));
+            return false;
+        }
+        final Json responseJson = Json.parse(rawResponse);
+
+        final String errorString = responseJson.getString("error");
+        if (! Util.isBlank(errorString)) {
+            Logger.debug("Received error from " + _toString() + ": " + errorString);
+            return false;
+        }
+
+        return true;
+    }
+
+    @Override
     public Boolean supportsNotifications() {
         if (_zmqEndpoints == null) {
             _zmqEndpoints = _getZmqEndpoints();

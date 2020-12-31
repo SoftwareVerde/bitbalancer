@@ -1,5 +1,6 @@
 package com.softwareverde.guvnor.proxy.rpc.connector;
 
+import com.softwareverde.bitcoin.block.Block;
 import com.softwareverde.guvnor.proxy.NotificationType;
 import com.softwareverde.guvnor.proxy.rpc.ChainHeight;
 import com.softwareverde.guvnor.proxy.rpc.NotificationCallback;
@@ -64,6 +65,11 @@ public class FakeBitcoinRpcConnector implements BitcoinRpcConnector {
 
     @Override
     public Boolean validateBlockTemplate(final BlockTemplate blockTemplate, final Monitor monitor) {
+        return null;
+    }
+
+    @Override
+    public Boolean submitBlock(final Block block, final Monitor monitor) {
         return null;
     }
 

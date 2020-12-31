@@ -1,5 +1,6 @@
 package com.softwareverde.guvnor.proxy.rpc.connector;
 
+import com.softwareverde.bitcoin.block.Block;
 import com.softwareverde.bitcoin.util.Util;
 import com.softwareverde.guvnor.proxy.NotificationType;
 import com.softwareverde.guvnor.proxy.rpc.ChainHeight;
@@ -21,6 +22,7 @@ public interface BitcoinRpcConnector {
     ChainHeight getChainHeight(Monitor monitor);
     BlockTemplate getBlockTemplate(Monitor monitor);
     Boolean validateBlockTemplate(BlockTemplate blockTemplate, Monitor monitor);
+    Boolean submitBlock(Block block, Monitor monitor);
 
     default Response handleRequest(Request request) {
         return this.handleRequest(request, null);
@@ -29,11 +31,17 @@ public interface BitcoinRpcConnector {
     default ChainHeight getChainHeight() {
         return this.getChainHeight(null);
     }
+
     default BlockTemplate getBlockTemplate() {
         return this.getBlockTemplate(null);
     }
+
     default Boolean validateBlockTemplate(BlockTemplate blockTemplate) {
         return this.validateBlockTemplate(blockTemplate, null);
+    }
+
+    default Boolean submitBlock(Block block) {
+        return this.submitBlock(block, null);
     }
 
     Boolean supportsNotifications();

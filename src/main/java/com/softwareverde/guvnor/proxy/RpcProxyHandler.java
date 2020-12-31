@@ -1,7 +1,13 @@
 package com.softwareverde.guvnor.proxy;
 
+import com.softwareverde.bitcoin.block.Block;
+import com.softwareverde.bitcoin.block.BlockInflater;
+import com.softwareverde.bitcoin.server.database.BatchRunner;
+import com.softwareverde.constable.bytearray.ByteArray;
 import com.softwareverde.constable.bytearray.MutableByteArray;
+import com.softwareverde.constable.list.List;
 import com.softwareverde.constable.list.mutable.MutableList;
+import com.softwareverde.cryptography.hash.sha256.Sha256Hash;
 import com.softwareverde.guvnor.proxy.node.selector.NodeSelector;
 import com.softwareverde.guvnor.proxy.rpc.RpcConfiguration;
 import com.softwareverde.guvnor.proxy.rpc.connector.BitcoinRpcConnector;
@@ -15,10 +21,13 @@ import com.softwareverde.util.Container;
 import com.softwareverde.util.StringUtil;
 import com.softwareverde.util.timer.NanoTimer;
 
+import java.util.concurrent.atomic.AtomicInteger;
+
 public class RpcProxyHandler implements Servlet {
     public enum Method {
         GET_BLOCK_TEMPLATE("getblocktemplate"),
-        GET_BLOCK_TEMPLATE_LIGHT("getblocktemplatelight");
+        GET_BLOCK_TEMPLATE_LIGHT("getblocktemplatelight"),
+        SUBMIT_BLOCK("submitblock");
 
         protected final String _value;
 
@@ -43,6 +52,41 @@ public class RpcProxyHandler implements Servlet {
     protected final NodeSelector _nodeSelector;
     protected final BlockTemplateManager _blockTemplateManager;
 
+    protected Boolean _submitBlockToAllNodes(final Block block) {
+        final AtomicInteger acceptCount = new AtomicInteger(0);
+        final AtomicInteger rejectCount = new AtomicInteger(0);
+
+        final Sha256Hash blockHash = block.getHash();
+
+        try {
+            final List<RpcConfiguration> rpcConfigurations = _nodeSelector.getNodes();
+            final BatchRunner<RpcConfiguration> batchRunner = new BatchRunner<>(1, true);
+            batchRunner.run(rpcConfigurations, new BatchRunner.Batch<RpcConfiguration>() {
+                @Override
+                public void run(final List<RpcConfiguration> batchItems) throws Exception {
+                    final RpcConfiguration rpcConfiguration = batchItems.get(0);
+                    final BitcoinRpcConnector bitcoinRpcConnector = rpcConfiguration.getBitcoinRpcConnector();
+
+                    final Boolean wasSuccess = bitcoinRpcConnector.submitBlock(block);
+                    if (wasSuccess) {
+                        Logger.info("Block " + blockHash + " accepted by " + rpcConfiguration + ".");
+                        acceptCount.incrementAndGet();
+                    }
+                    else {
+                        Logger.info("Block " + blockHash + " rejected by " + rpcConfiguration + ".");
+                        rejectCount.incrementAndGet();
+                    }
+                }
+            });
+        }
+        catch (final Exception exception) {
+            Logger.warn("Error submitting block.", exception);
+        }
+
+        Logger.info("Block " + blockHash + " accepted by " + acceptCount.get() + " nodes, rejected by " + rejectCount.get() + " nodes.");
+        return (acceptCount.get() > 0);
+    }
+
     public RpcProxyHandler(final NodeSelector nodeSelector, final BlockTemplateManager blockTemplateManager) {
         _nodeSelector = nodeSelector;
         _blockTemplateManager = blockTemplateManager;
@@ -53,9 +97,10 @@ public class RpcProxyHandler implements Servlet {
         final Long requestId;
         final String rawMethod;
         final Method method;
+        final Json requestJson;
         { // Parse the method from the request object...
             final MutableByteArray rawPostData = MutableByteArray.wrap(request.getRawPostData());
-            final Json requestJson = Json.parse(StringUtil.bytesToString(rawPostData.unwrap()));
+            requestJson = Json.parse(StringUtil.bytesToString(rawPostData.unwrap()));
             requestId = requestJson.getLong("id");
             rawMethod = requestJson.getString("method");
             method = Method.fromString(rawMethod);
@@ -86,6 +131,34 @@ public class RpcProxyHandler implements Servlet {
                 responseJson.put("error", null);
                 responseJson.put("result", blockTemplate);
             }
+
+            response.setContent(responseJson.toString());
+            return response;
+        }
+        else if (method == Method.SUBMIT_BLOCK) {
+            final String resultString;
+            {
+                final BlockInflater blockInflater = new BlockInflater();
+                final ByteArray blockData = ByteArray.fromHexString(requestJson.getString("hexdata"));
+                final Block block = (blockData != null ? blockInflater.fromBytes(blockData) : null);
+
+                if (block == null) {
+                    resultString = "Block decode failed";
+                }
+                else {
+                    final Boolean wasValid = _submitBlockToAllNodes(block);
+                    resultString = (wasValid ? null : "rejected");
+                }
+            }
+
+            final Response response = new Response();
+
+            final Json responseJson = new Json();
+            responseJson.put("id", requestId);
+
+            response.setCode(Response.Codes.OK);
+            responseJson.put("error", null);
+            responseJson.put("result", resultString);
 
             response.setContent(responseJson.toString());
             return response;
