@@ -126,6 +126,10 @@ public class BlockTemplate implements Jsonable {
         return _blockHeight;
     }
 
+    public Long getCoinbaseAmount() {
+        return _coinbaseAmount;
+    }
+
     public Sha256Hash getPreviousBlockHash() {
         return _previousBlockHash;
     }
@@ -134,7 +138,7 @@ public class BlockTemplate implements Jsonable {
         return _transactions.getCount();
     }
 
-    public Block toBlock() {
+    public MutableBlock toBlock() {
         final AddressInflater addressInflater = new AddressInflater();
         final TransactionInflater transactionInflater = new TransactionInflater();
 

@@ -47,7 +47,11 @@ public class BlockTemplateManager {
                             monitor.setMaxDurationMs(maxTimeoutMs);
                         }
 
+                        final NanoTimer nanoTimer = new NanoTimer();
+                        nanoTimer.start();
                         final BlockTemplate blockTemplate = bitcoinRpcConnector.getBlockTemplate(monitor);
+                        nanoTimer.stop();
+                        Logger.debug("Template acquired from " + rpcConfiguration + " in " + nanoTimer.getMillisecondsElapsed() + "ms.");
 
                         if (blockTemplate != null) {
                             blockTemplates.put(rpcConfiguration, blockTemplate);

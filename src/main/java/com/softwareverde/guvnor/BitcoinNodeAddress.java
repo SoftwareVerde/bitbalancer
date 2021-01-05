@@ -26,4 +26,9 @@ public class BitcoinNodeAddress {
     public Boolean isSecure() {
         return _isSecure;
     }
+
+    @Override
+    public String toString() {
+        return (_host + ":" + _port);
+    }
 }

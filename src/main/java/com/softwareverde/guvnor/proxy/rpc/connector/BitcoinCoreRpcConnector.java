@@ -130,6 +130,10 @@ public class BitcoinCoreRpcConnector implements BitcoinRpcConnector {
         return zmqEndpoints;
     }
 
+    public BitcoinCoreRpcConnector(final BitcoinNodeAddress bitcoinNodeAddress) {
+        this(bitcoinNodeAddress, null);
+    }
+
     public BitcoinCoreRpcConnector(final BitcoinNodeAddress bitcoinNodeAddress, final RpcCredentials rpcCredentials) {
         _bitcoinNodeAddress = bitcoinNodeAddress;
         _rpcCredentials = rpcCredentials;

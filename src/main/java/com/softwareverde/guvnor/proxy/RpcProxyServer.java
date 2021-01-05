@@ -80,6 +80,8 @@ public class RpcProxyServer {
         final NotificationCallback callback = new NotificationCallback() {
             @Override
             public void onNewNotification(final Notification notification) {
+                Logger.trace("Notification from " + rpcConfiguration + ": " + notification.notificationType);
+
                 BlockHeader blockHeader = null;
                 boolean shouldUpdateChainHeight = false;
                 if (hasBlockHashEndpoint) {
@@ -102,6 +104,7 @@ public class RpcProxyServer {
 
                 if (shouldUpdateChainHeight) {
                     // Update the node's ChainWork...
+                    Logger.trace("Requesting chainHeight for " + rpcConfiguration + " after " + notification.notificationType + " notification.");
                     final BitcoinRpcConnector bitcoinRpcConnector = rpcConfiguration.getBitcoinRpcConnector();
                     final ChainHeight chainHeight = bitcoinRpcConnector.getChainHeight();
                     if (chainHeight != null) {
@@ -118,6 +121,9 @@ public class RpcProxyServer {
                             Logger.debug("New best block detected (" + chainHeight + "). Refreshing all nodes' chainHeights.");
                             _updateChainHeights(chainHeight);
                         }
+                    }
+                    else {
+                        Logger.debug("Unable to get chainHeight for " + rpcConfiguration + " after block notification.");
                     }
                 }
 
