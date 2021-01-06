@@ -141,13 +141,18 @@ public class RpcProxyHandler implements Servlet {
             return response;
         }
         else if (method == Method.SUBMIT_BLOCK) {
+            Logger.debug("Block submitted.");
             final String resultString;
             {
+                final Json paramsJson = requestJson.get("params");
                 final BlockInflater blockInflater = new BlockInflater();
-                final ByteArray blockData = ByteArray.fromHexString(requestJson.getString("hexdata"));
+                final String blockDataString = paramsJson.getString(0); // hexdata
+                // final String dummyData = paramsJson.getString(1); // dummy
+                final ByteArray blockData = ByteArray.fromHexString(blockDataString);
                 final Block block = (blockData != null ? blockInflater.fromBytes(blockData) : null);
 
                 if (block == null) {
+                    Logger.debug("Block failed to decode: " + blockDataString);
                     resultString = "Block decode failed";
                 }
                 else {
@@ -164,6 +169,8 @@ public class RpcProxyHandler implements Servlet {
             response.setCode(Response.Codes.OK);
             responseJson.put("error", null);
             responseJson.put("result", resultString);
+
+            Logger.debug("Submit Block Result: " + resultString);
 
             response.setContent(responseJson.toString());
             return response;

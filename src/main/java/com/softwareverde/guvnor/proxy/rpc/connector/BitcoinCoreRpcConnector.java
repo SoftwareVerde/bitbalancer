@@ -411,8 +411,8 @@ public class BitcoinCoreRpcConnector implements BitcoinRpcConnector {
                 final String blockDataHexString = blockData.toString();
 
                 final Json paramsJson = new Json(true);
-                paramsJson.put("hexdata", blockDataHexString.toLowerCase());
-                // paramsJson.put("dummy", 0);
+                paramsJson.add(blockDataHexString.toLowerCase()); // hexdata
+                // paramsJson.add(0); // dummy
                 json.put("params", paramsJson);
             }
 
