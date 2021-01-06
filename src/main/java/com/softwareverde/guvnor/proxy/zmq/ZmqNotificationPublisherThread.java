@@ -67,10 +67,13 @@ public class ZmqNotificationPublisherThread extends Thread {
     public void sendMessage(final Notification notification) {
         final NotificationType notificationType = notification.notificationType;
         final ByteArray payload = notification.payload;
-        final String payloadString = payload.toString();
 
         final String messageTypeString = ZmqMessageTypeConverter.toSubscriptionString(notificationType);
-        final ZMsg zMsg = ZMsg.newStringMsg(messageTypeString, payloadString.toLowerCase());
+        final ZMsg zMsg = new ZMsg();
+        { // Frames are in reverse-order...
+            zMsg.push(payload.getBytes());
+            zMsg.push(messageTypeString);
+        }
 
         synchronized (_messageQueue) {
             _messageQueue.add(zMsg);

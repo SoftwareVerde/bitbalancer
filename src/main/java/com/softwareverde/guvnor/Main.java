@@ -37,7 +37,7 @@ public class Main {
 
     protected Main(final String[] arguments) {
         Logger.setLog(LineNumberAnnotatedLog.getInstance());
-        Logger.setLogLevel(LogLevel.DEBUG);
+        Logger.setLogLevel(LogLevel.ON);
         Logger.setLogLevel("com.softwareverde.network", LogLevel.WARN);
         Logger.setLogLevel("com.softwareverde.util", LogLevel.WARN);
         Logger.setLogLevel("com.softwareverde.json", LogLevel.ERROR);

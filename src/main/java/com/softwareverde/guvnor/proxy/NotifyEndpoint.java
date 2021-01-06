@@ -86,12 +86,8 @@ public class NotifyEndpoint implements Servlet {
             return errorResponse;
         }
 
-        final RpcConfiguration bestRpcConfiguration = _context.getBestRpcConfiguration();
-        if ( (bestRpcConfiguration != null) && Util.areEqual(bestRpcConfiguration, registeredRpcConfiguration) ) {
-            // If the notification if from the highest ChainHeight node, then relay the message.
-            final Notification notification = new Notification(_notificationType, postData);
-            _context.relayNotification(notification);
-        }
+        final Notification notification = new Notification(_notificationType, postData);
+        _context.relayNotification(notification);
 
         final Response response = new Response();
         response.setCode(Response.Codes.OK);

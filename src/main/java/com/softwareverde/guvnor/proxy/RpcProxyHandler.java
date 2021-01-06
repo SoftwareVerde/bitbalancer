@@ -12,6 +12,8 @@ import com.softwareverde.guvnor.proxy.node.selector.NodeSelector;
 import com.softwareverde.guvnor.proxy.rpc.RpcConfiguration;
 import com.softwareverde.guvnor.proxy.rpc.connector.BitcoinRpcConnector;
 import com.softwareverde.guvnor.proxy.rpc.connector.BlockTemplate;
+import com.softwareverde.guvnor.proxy.zmq.ZmqConfiguration;
+import com.softwareverde.guvnor.proxy.zmq.ZmqMessageTypeConverter;
 import com.softwareverde.http.server.servlet.Servlet;
 import com.softwareverde.http.server.servlet.request.Request;
 import com.softwareverde.http.server.servlet.response.Response;
@@ -27,7 +29,8 @@ public class RpcProxyHandler implements Servlet {
     public enum Method {
         GET_BLOCK_TEMPLATE("getblocktemplate"),
         GET_BLOCK_TEMPLATE_LIGHT("getblocktemplatelight"),
-        SUBMIT_BLOCK("submitblock");
+        SUBMIT_BLOCK("submitblock"),
+        GET_ZMQ_NOTIFICATIONS("getzmqnotifications");
 
         protected final String _value;
 
@@ -49,6 +52,7 @@ public class RpcProxyHandler implements Servlet {
         }
     }
 
+    protected final ZmqConfiguration _zmqConfiguration;
     protected final NodeSelector _nodeSelector;
     protected final BlockTemplateManager _blockTemplateManager;
 
@@ -87,9 +91,10 @@ public class RpcProxyHandler implements Servlet {
         return (acceptCount.get() > 0);
     }
 
-    public RpcProxyHandler(final NodeSelector nodeSelector, final BlockTemplateManager blockTemplateManager) {
+    public RpcProxyHandler(final NodeSelector nodeSelector, final BlockTemplateManager blockTemplateManager, final ZmqConfiguration zmqConfiguration) {
         _nodeSelector = nodeSelector;
         _blockTemplateManager = blockTemplateManager;
+        _zmqConfiguration = zmqConfiguration;
     }
 
     @Override
@@ -149,6 +154,35 @@ public class RpcProxyHandler implements Servlet {
                     final Boolean wasValid = _submitBlockToAllNodes(block);
                     resultString = (wasValid ? null : "rejected");
                 }
+            }
+
+            final Response response = new Response();
+
+            final Json responseJson = new Json();
+            responseJson.put("id", requestId);
+
+            response.setCode(Response.Codes.OK);
+            responseJson.put("error", null);
+            responseJson.put("result", resultString);
+
+            response.setContent(responseJson.toString());
+            return response;
+        }
+        else if (method == Method.GET_ZMQ_NOTIFICATIONS) {
+            final String resultString;
+            {
+                final Json zmqEndpointsJson = new Json(true);
+                if (_zmqConfiguration != null) {
+                    for (final NotificationType notificationType : _zmqConfiguration.getSupportedMessageTypes()) {
+                        final Integer listenPort = _zmqConfiguration.getPort(notificationType);
+                        final Json endpointConfiguration = new Json(false);
+                        endpointConfiguration.put("type", ZmqMessageTypeConverter.toPublishString(notificationType));
+                        endpointConfiguration.put("address", "tcp://0.0.0.0:" + listenPort); // TODO: Determine if the address should be 0.0.0.0 or 127.0.0.1 or other...
+
+                        zmqEndpointsJson.add(endpointConfiguration);
+                    }
+                }
+                resultString = zmqEndpointsJson.toString();
             }
 
             final Response response = new Response();
