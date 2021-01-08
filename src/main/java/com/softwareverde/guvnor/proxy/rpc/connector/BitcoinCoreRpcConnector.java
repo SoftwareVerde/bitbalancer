@@ -437,7 +437,11 @@ public class BitcoinCoreRpcConnector implements BitcoinRpcConnector {
             return false;
         }
 
-        return true;
+        // Result is considered valid according to the C++ code. (string "null" or actual null are both accepted)
+        // {"result": null}
+        final String resultValue = responseJson.getOrNull("result", Json.Types.STRING);
+        if (resultValue == null) { return true; }
+        return Util.areEqual("null", resultValue.toLowerCase());
     }
 
     @Override
