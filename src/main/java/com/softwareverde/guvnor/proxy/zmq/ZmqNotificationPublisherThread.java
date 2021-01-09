@@ -1,8 +1,9 @@
 package com.softwareverde.guvnor.proxy.zmq;
 
+import com.softwareverde.bitcoin.rpc.RpcNotification;
+import com.softwareverde.bitcoin.rpc.RpcNotificationType;
+import com.softwareverde.bitcoin.rpc.core.zmq.ZmqMessageTypeConverter;
 import com.softwareverde.constable.bytearray.ByteArray;
-import com.softwareverde.guvnor.proxy.Notification;
-import com.softwareverde.guvnor.proxy.NotificationType;
 import com.softwareverde.logging.Logger;
 import org.zeromq.SocketType;
 import org.zeromq.ZContext;
@@ -12,17 +13,17 @@ import org.zeromq.ZMsg;
 import java.util.LinkedList;
 
 public class ZmqNotificationPublisherThread extends Thread {
-    public static ZmqNotificationPublisherThread newZmqNotificationPublisherThread(final NotificationType notificationType, final String host, final Integer zmqPort) {
+    public static ZmqNotificationPublisherThread newZmqNotificationPublisherThread(final RpcNotificationType notificationType, final String host, final Integer zmqPort) {
         final LinkedList<ZMsg> messageQueue = new LinkedList<>();
 
         return new ZmqNotificationPublisherThread(notificationType, host, zmqPort, messageQueue);
     }
 
-    protected final NotificationType _notificationType;
+    protected final RpcNotificationType _notificationType;
     protected final Integer _port;
     protected final LinkedList<ZMsg> _messageQueue;
 
-    protected ZmqNotificationPublisherThread(final NotificationType notificationType, final String host, final Integer port, final LinkedList<ZMsg> messageQueue) {
+    protected ZmqNotificationPublisherThread(final RpcNotificationType notificationType, final String host, final Integer port, final LinkedList<ZMsg> messageQueue) {
         super(new Runnable() {
             @Override
             public void run() {
@@ -64,8 +65,8 @@ public class ZmqNotificationPublisherThread extends Thread {
         _messageQueue = messageQueue;
     }
 
-    public void sendMessage(final Notification notification) {
-        final NotificationType notificationType = notification.notificationType;
+    public void sendMessage(final RpcNotification notification) {
+        final RpcNotificationType notificationType = notification.rpcNotificationType;
         final ByteArray payload = notification.payload;
 
         final String messageTypeString = ZmqMessageTypeConverter.toSubscriptionString(notificationType);
@@ -81,7 +82,7 @@ public class ZmqNotificationPublisherThread extends Thread {
         }
     }
 
-    public NotificationType getMessageType() {
+    public RpcNotificationType getMessageType() {
         return _notificationType;
     }
 

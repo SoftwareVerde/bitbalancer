@@ -1,14 +1,14 @@
 package com.softwareverde.guvnor.proxy;
 
+import com.softwareverde.bitcoin.rpc.BlockTemplate;
+import com.softwareverde.bitcoin.rpc.monitor.Monitor;
 import com.softwareverde.bitcoin.server.database.BatchRunner;
 import com.softwareverde.bitcoin.util.Util;
 import com.softwareverde.constable.list.List;
 import com.softwareverde.guvnor.proxy.node.selector.NodeSelector;
 import com.softwareverde.guvnor.proxy.rpc.ChainHeight;
 import com.softwareverde.guvnor.proxy.rpc.RpcConfiguration;
-import com.softwareverde.guvnor.proxy.rpc.connector.BitcoinRpcConnector;
-import com.softwareverde.guvnor.proxy.rpc.connector.BlockTemplate;
-import com.softwareverde.guvnor.proxy.rpc.connector.Monitor;
+import com.softwareverde.guvnor.proxy.rpc.connector.GuvnorRpcConnector;
 import com.softwareverde.logging.Logger;
 import com.softwareverde.util.Container;
 import com.softwareverde.util.timer.NanoTimer;
@@ -39,7 +39,7 @@ public class BlockTemplateManager {
                     @Override
                     public void run(final List<RpcConfiguration> batch) {
                         final RpcConfiguration rpcConfiguration = batch.get(0); // Workaround for non-specialization of BatchRunner of size 1.
-                        final BitcoinRpcConnector bitcoinRpcConnector = rpcConfiguration.getBitcoinRpcConnector();
+                        final GuvnorRpcConnector bitcoinRpcConnector = rpcConfiguration.getBitcoinRpcConnector();
 
                         final Monitor monitor = bitcoinRpcConnector.getMonitor();
                         final Long maxTimeoutMs = rpcConfiguration.getMaxTimeoutMs();
@@ -78,7 +78,7 @@ public class BlockTemplateManager {
                         @Override
                         public void run(final List<RpcConfiguration> batch) {
                             final RpcConfiguration rpcConfigurationForValidation = batch.get(0); // Workaround for non-specialization of BatchRunner of size 1.
-                            final BitcoinRpcConnector bitcoinRpcConnectorForValidation = rpcConfigurationForValidation.getBitcoinRpcConnector();
+                            final GuvnorRpcConnector bitcoinRpcConnectorForValidation = rpcConfigurationForValidation.getBitcoinRpcConnector();
 
                             final Monitor monitor = bitcoinRpcConnectorForValidation.getMonitor();
                             final Long maxTimeoutMs = rpcConfigurationForValidation.getMaxTimeoutMs();
@@ -144,7 +144,7 @@ public class BlockTemplateManager {
 
     public BlockTemplate getBlockTemplate() {
         final RpcConfiguration bestRpcConfiguration = _nodeSelector.selectBestNode();
-        final BitcoinRpcConnector bestBitcoinRpcConnector = bestRpcConfiguration.getBitcoinRpcConnector();
+        final GuvnorRpcConnector bestBitcoinRpcConnector = bestRpcConfiguration.getBitcoinRpcConnector();
 
         final List<RpcConfiguration> rpcConfigurations = _nodeSelector.getNodes();
 
@@ -174,7 +174,7 @@ public class BlockTemplateManager {
                     final NanoTimer nanoTimer = new NanoTimer();
 
                     final RpcConfiguration rpcConfiguration = rpcConfigurations.get(0); // Workaround for non-specialization of BatchRunner of size 1.
-                    final BitcoinRpcConnector bitcoinRpcConnector = rpcConfiguration.getBitcoinRpcConnector();
+                    final GuvnorRpcConnector bitcoinRpcConnector = rpcConfiguration.getBitcoinRpcConnector();
 
                     final ChainHeight chainHeight = rpcConfiguration.getChainHeight();
                     final boolean isNodeBehind = bestChainHeight.isBetterThan(chainHeight);

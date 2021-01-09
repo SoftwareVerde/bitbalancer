@@ -1,25 +1,25 @@
 package com.softwareverde.guvnor.proxy.rpc;
 
-import com.softwareverde.guvnor.proxy.rpc.connector.BitcoinRpcConnector;
+import com.softwareverde.guvnor.proxy.rpc.connector.GuvnorRpcConnector;
 import com.softwareverde.util.Util;
 
 public class RpcConfiguration {
     protected final String _name;
-    protected final BitcoinRpcConnector _bitcoinRpcConnector;
+    protected final GuvnorRpcConnector _bitcoinRpcConnector;
     protected final Integer _hierarchy;
     protected final Long _maxTimeoutMs;
 
     protected ChainHeight _chainHeight = ChainHeight.UNKNOWN_CHAIN_HEIGHT;
 
-    public RpcConfiguration(final String name, final BitcoinRpcConnector bitcoinRpcConnector) {
+    public RpcConfiguration(final String name, final GuvnorRpcConnector bitcoinRpcConnector) {
         this(name, bitcoinRpcConnector, null);
     }
 
-    public RpcConfiguration(final String name, final BitcoinRpcConnector bitcoinRpcConnector, final Integer preferenceOrder) {
+    public RpcConfiguration(final String name, final GuvnorRpcConnector bitcoinRpcConnector, final Integer preferenceOrder) {
         this(name, bitcoinRpcConnector, preferenceOrder, null);
     }
 
-    public RpcConfiguration(final String name, final BitcoinRpcConnector bitcoinRpcConnector, final Integer preferenceOrder, final Long maxTimeoutMs) {
+    public RpcConfiguration(final String name, final GuvnorRpcConnector bitcoinRpcConnector, final Integer preferenceOrder, final Long maxTimeoutMs) {
         _name = name;
         _bitcoinRpcConnector = bitcoinRpcConnector;
         _hierarchy = preferenceOrder;
@@ -30,7 +30,7 @@ public class RpcConfiguration {
         return _name;
     }
 
-    public BitcoinRpcConnector getBitcoinRpcConnector() {
+    public GuvnorRpcConnector getBitcoinRpcConnector() {
         return _bitcoinRpcConnector;
     }
 

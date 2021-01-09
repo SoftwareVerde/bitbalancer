@@ -2,6 +2,9 @@ package com.softwareverde.guvnor.proxy;
 
 import com.softwareverde.bitcoin.block.header.BlockHeader;
 import com.softwareverde.bitcoin.block.header.BlockHeaderInflater;
+import com.softwareverde.bitcoin.rpc.RpcNotification;
+import com.softwareverde.bitcoin.rpc.RpcNotificationCallback;
+import com.softwareverde.bitcoin.rpc.RpcNotificationType;
 import com.softwareverde.bitcoin.util.StringUtil;
 import com.softwareverde.concurrent.service.SleepyService;
 import com.softwareverde.constable.bytearray.ByteArray;
@@ -10,9 +13,8 @@ import com.softwareverde.cryptography.hash.sha256.Sha256Hash;
 import com.softwareverde.guvnor.proxy.node.selector.HashMapNodeSelector;
 import com.softwareverde.guvnor.proxy.node.selector.NodeSelector;
 import com.softwareverde.guvnor.proxy.rpc.ChainHeight;
-import com.softwareverde.guvnor.proxy.rpc.NotificationCallback;
 import com.softwareverde.guvnor.proxy.rpc.RpcConfiguration;
-import com.softwareverde.guvnor.proxy.rpc.connector.BitcoinRpcConnector;
+import com.softwareverde.guvnor.proxy.rpc.connector.GuvnorRpcConnector;
 import com.softwareverde.guvnor.proxy.zmq.ZmqConfiguration;
 import com.softwareverde.guvnor.proxy.zmq.ZmqNotificationPublisherThread;
 import com.softwareverde.http.server.HttpServer;
@@ -31,8 +33,8 @@ public class RpcProxyServer {
     protected final NodeSelector _nodeSelector;
     protected final BlockTemplateManager _blockTemplateManager;
 
-    protected final ConcurrentHashMap<NotificationType, ZmqNotificationPublisherThread> _zmqPublisherThreads = new ConcurrentHashMap<>();
-    protected final CircleBuffer<Notification> _recentNotifications = new CircleBuffer<>(32);
+    protected final ConcurrentHashMap<RpcNotificationType, ZmqNotificationPublisherThread> _zmqPublisherThreads = new ConcurrentHashMap<>();
+    protected final CircleBuffer<RpcNotification> _recentNotifications = new CircleBuffer<>(32);
 
     protected final SleepyService _chainWorkMonitor;
 
@@ -40,9 +42,9 @@ public class RpcProxyServer {
      * Adds the Notification to the _recentNotifications set.
      *  Returns true if the Notification did not already exist within the _recentNotifications set.
      */
-    protected Boolean _registerRecentNotification(final Notification notification) {
+    protected Boolean _registerRecentNotification(final RpcNotification notification) {
         synchronized (_recentNotifications) {
-            for (final Notification recentNotification : _recentNotifications) {
+            for (final RpcNotification recentNotification : _recentNotifications) {
                 if (Util.areEqual(recentNotification, notification)) {
                     return false;
                 }
@@ -53,8 +55,8 @@ public class RpcProxyServer {
         }
     }
 
-    protected void _relayNotification(final Notification notification) {
-        final NotificationType notificationType = notification.notificationType;
+    protected void _relayNotification(final RpcNotification notification) {
+        final RpcNotificationType notificationType = notification.rpcNotificationType;
         final ZmqNotificationPublisherThread publisherThread = _zmqPublisherThreads.get(notificationType);
         if (publisherThread != null) {
             publisherThread.sendMessage(notification);
@@ -71,7 +73,7 @@ public class RpcProxyServer {
                 final ChainHeight chainHeight = rpcConfiguration.getChainHeight();
 
                 if (bestChainHeight.isBetterThan(chainHeight)) {
-                    final BitcoinRpcConnector bitcoinRpcConnector = rpcConfiguration.getBitcoinRpcConnector();
+                    final GuvnorRpcConnector bitcoinRpcConnector = rpcConfiguration.getBitcoinRpcConnector();
                     final ChainHeight newChainHeight = bitcoinRpcConnector.getChainHeight();
                     if ( (newChainHeight != null) && newChainHeight.isBetterThan(chainHeight) ) {
                         Logger.debug("Updating chainHeight for " + rpcConfiguration + ": " + newChainHeight);
@@ -94,10 +96,10 @@ public class RpcProxyServer {
         }
     }
 
-    protected void _onBlockNotification(final RpcConfiguration rpcConfiguration, final Notification notification, final BlockHeader blockHeader) {
+    protected void _onBlockNotification(final RpcConfiguration rpcConfiguration, final RpcNotification notification, final BlockHeader blockHeader) {
         // Update the node's ChainWork...
-        Logger.trace("Requesting chainHeight for " + rpcConfiguration + " after " + notification.notificationType + " notification.");
-        final BitcoinRpcConnector bitcoinRpcConnector = rpcConfiguration.getBitcoinRpcConnector();
+        Logger.trace("Requesting chainHeight for " + rpcConfiguration + " after " + notification.rpcNotificationType + " notification.");
+        final GuvnorRpcConnector bitcoinRpcConnector = rpcConfiguration.getBitcoinRpcConnector();
         final ChainHeight chainHeight = bitcoinRpcConnector.getChainHeight();
         if (chainHeight != null) {
             final ChainHeight previousBestChainHeight = _nodeSelector.getBestChainHeight();
@@ -120,26 +122,26 @@ public class RpcProxyServer {
     }
 
     protected void _subscribeToNotifications(final RpcConfiguration rpcConfiguration) {
-        final BitcoinRpcConnector bitcoinRpcConnector = rpcConfiguration.getBitcoinRpcConnector();
+        final GuvnorRpcConnector bitcoinRpcConnector = rpcConfiguration.getBitcoinRpcConnector();
         if (! bitcoinRpcConnector.supportsNotifications()) { return; }
 
-        final Boolean hasBlockEndpoint = bitcoinRpcConnector.supportsNotification(NotificationType.BLOCK);
-        final Boolean hasBlockHashEndpoint = bitcoinRpcConnector.supportsNotification(NotificationType.BLOCK_HASH);
+        final Boolean hasBlockEndpoint = bitcoinRpcConnector.supportsNotification(RpcNotificationType.BLOCK);
+        final Boolean hasBlockHashEndpoint = bitcoinRpcConnector.supportsNotification(RpcNotificationType.BLOCK_HASH);
 
-        final NotificationCallback callback = new NotificationCallback() {
+        final RpcNotificationCallback callback = new RpcNotificationCallback() {
             @Override
-            public void onNewNotification(final Notification notification) {
-                Logger.trace("Notification from " + rpcConfiguration + ": " + notification.notificationType);
+            public void onNewNotification(final RpcNotification notification) {
+                Logger.trace("Notification from " + rpcConfiguration + ": " + notification.rpcNotificationType);
 
                 BlockHeader blockHeader = null;
                 boolean shouldUpdateChainHeight = false;
                 if (hasBlockHashEndpoint) {
-                    if (Util.areEqual(NotificationType.BLOCK_HASH, notification.notificationType)) {
+                    if (Util.areEqual(RpcNotificationType.BLOCK_HASH, notification.rpcNotificationType)) {
                         shouldUpdateChainHeight = true;
                     }
                 }
                 else if (hasBlockEndpoint) {
-                    if (Util.areEqual(NotificationType.BLOCK, notification.notificationType)) {
+                    if (Util.areEqual(RpcNotificationType.BLOCK, notification.rpcNotificationType)) {
                         shouldUpdateChainHeight = true;
 
                         final String blockHeaderHexString = StringUtil.bytesToString(
@@ -157,7 +159,7 @@ public class RpcProxyServer {
 
                 final Boolean isUniqueNotification = _registerRecentNotification(notification);
                 if (isUniqueNotification) {
-                    Logger.trace("Relaying: " + notification.notificationType + " " + HexUtil.toHexString(notification.payload.getBytes(0, Sha256Hash.BYTE_COUNT)) + " +" + (notification.payload.getByteCount() - Sha256Hash.BYTE_COUNT) + " from " + rpcConfiguration);
+                    Logger.trace("Relaying: " + notification.rpcNotificationType + " " + HexUtil.toHexString(notification.payload.getBytes(0, Sha256Hash.BYTE_COUNT)) + " +" + (notification.payload.getByteCount() - Sha256Hash.BYTE_COUNT) + " from " + rpcConfiguration);
                     _relayNotification(notification);
                 }
             }
@@ -185,7 +187,7 @@ public class RpcProxyServer {
             _subscribeToNotifications(rpcConfiguration);
         }
         for (final RpcConfiguration rpcConfiguration : rpcConfigurations) {
-            final BitcoinRpcConnector bitcoinRpcConnector = rpcConfiguration.getBitcoinRpcConnector();
+            final GuvnorRpcConnector bitcoinRpcConnector = rpcConfiguration.getBitcoinRpcConnector();
             final ChainHeight chainHeight = bitcoinRpcConnector.getChainHeight();
             if (chainHeight != null) {
                 rpcConfiguration.setChainHeight(chainHeight);
@@ -193,7 +195,7 @@ public class RpcProxyServer {
         }
 
         if (zmqConfiguration != null) {
-            for (final NotificationType zmqNotificationType : zmqConfiguration.getSupportedMessageTypes()) {
+            for (final RpcNotificationType zmqNotificationType : zmqConfiguration.getSupportedMessageTypes()) {
                 final Integer zmqPort = zmqConfiguration.getPort(zmqNotificationType);
                 final ZmqNotificationPublisherThread zmqNotificationPublisherThread = ZmqNotificationPublisherThread.newZmqNotificationPublisherThread(zmqNotificationType, "*", zmqPort);
                 _zmqPublisherThreads.put(zmqNotificationType, zmqNotificationPublisherThread);
@@ -225,12 +227,12 @@ public class RpcProxyServer {
             }
 
             @Override
-            public void relayNotification(final Notification notification) {
+            public void relayNotification(final RpcNotification notification) {
                 _updateChainHeights(null);
 
                 final Boolean isUniqueNotification = _registerRecentNotification(notification);
                 if (isUniqueNotification) {
-                    Logger.trace("Relaying: " + notification.notificationType + " " + HexUtil.toHexString(notification.payload.getBytes(0, Sha256Hash.BYTE_COUNT)) + " +" + (notification.payload.getByteCount() - Sha256Hash.BYTE_COUNT) + " from http hook");
+                    Logger.trace("Relaying: " + notification.rpcNotificationType + " " + HexUtil.toHexString(notification.payload.getBytes(0, Sha256Hash.BYTE_COUNT)) + " +" + (notification.payload.getByteCount() - Sha256Hash.BYTE_COUNT) + " from http hook");
                     _relayNotification(notification);
                 }
             }
@@ -239,7 +241,7 @@ public class RpcProxyServer {
         final Endpoint blockNotifyEndpoint;
         {
             blockNotifyEndpoint = new Endpoint(
-                new NotifyEndpoint(NotificationType.BLOCK, notifyContext)
+                new NotifyEndpoint(RpcNotificationType.BLOCK, notifyContext)
             );
             blockNotifyEndpoint.setPath("/api/v1/publish/block/raw");
             blockNotifyEndpoint.setStrictPathEnabled(true);
@@ -248,7 +250,7 @@ public class RpcProxyServer {
         final Endpoint blockHashNotifyEndpoint;
         {
             blockHashNotifyEndpoint = new Endpoint(
-                new NotifyEndpoint(NotificationType.BLOCK_HASH, notifyContext, Sha256Hash.BYTE_COUNT)
+                new NotifyEndpoint(RpcNotificationType.BLOCK_HASH, notifyContext, Sha256Hash.BYTE_COUNT)
             );
             blockHashNotifyEndpoint.setPath("/api/v1/publish/block/hash");
             blockHashNotifyEndpoint.setStrictPathEnabled(true);
@@ -257,7 +259,7 @@ public class RpcProxyServer {
         final Endpoint transactionNotifyEndpoint;
         {
             transactionNotifyEndpoint = new Endpoint(
-                new NotifyEndpoint(NotificationType.TRANSACTION, notifyContext)
+                new NotifyEndpoint(RpcNotificationType.TRANSACTION, notifyContext)
             );
             transactionNotifyEndpoint.setPath("/api/v1/publish/transaction/raw");
             transactionNotifyEndpoint.setStrictPathEnabled(true);
@@ -266,7 +268,7 @@ public class RpcProxyServer {
         final Endpoint transactionHashNotifyEndpoint;
         {
             transactionHashNotifyEndpoint = new Endpoint(
-                new NotifyEndpoint(NotificationType.TRANSACTION_HASH, notifyContext, Sha256Hash.BYTE_COUNT)
+                new NotifyEndpoint(RpcNotificationType.TRANSACTION_HASH, notifyContext, Sha256Hash.BYTE_COUNT)
             );
             transactionHashNotifyEndpoint.setPath("/api/v1/publish/transaction/hash");
             transactionHashNotifyEndpoint.setStrictPathEnabled(true);
@@ -298,7 +300,7 @@ public class RpcProxyServer {
                     final ChainHeight chainHeight = rpcConfiguration.getChainHeight();
 
                     if (bestChainHeight.isBetterThan(chainHeight)) {
-                        final BitcoinRpcConnector bitcoinRpcConnector = rpcConfiguration.getBitcoinRpcConnector();
+                        final GuvnorRpcConnector bitcoinRpcConnector = rpcConfiguration.getBitcoinRpcConnector();
                         final ChainHeight newChainHeight = bitcoinRpcConnector.getChainHeight();
                         if ( (newChainHeight != null) && newChainHeight.isBetterThan(chainHeight) ) {
                             Logger.debug("Updating chainHeight for " + rpcConfiguration + ": " + newChainHeight);

@@ -7,11 +7,11 @@ import com.softwareverde.bitcoin.block.header.ImmutableBlockHeader;
 import com.softwareverde.bitcoin.block.header.difficulty.Difficulty;
 import com.softwareverde.bitcoin.block.validator.difficulty.AsertDifficultyCalculator;
 import com.softwareverde.bitcoin.block.validator.difficulty.AsertReferenceBlock;
+import com.softwareverde.bitcoin.rpc.BlockTemplate;
 import com.softwareverde.bitcoin.server.main.BitcoinConstants;
 import com.softwareverde.guvnor.proxy.node.selector.NodeSelector;
 import com.softwareverde.guvnor.proxy.rpc.ChainHeight;
 import com.softwareverde.guvnor.proxy.rpc.connector.BitcoinVerdeRpcConnector;
-import com.softwareverde.guvnor.proxy.rpc.connector.BlockTemplate;
 import com.softwareverde.logging.Logger;
 import com.softwareverde.util.type.time.SystemTime;
 

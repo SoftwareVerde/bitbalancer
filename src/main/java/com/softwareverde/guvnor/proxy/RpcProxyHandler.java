@@ -2,6 +2,9 @@ package com.softwareverde.guvnor.proxy;
 
 import com.softwareverde.bitcoin.block.Block;
 import com.softwareverde.bitcoin.block.BlockInflater;
+import com.softwareverde.bitcoin.rpc.BlockTemplate;
+import com.softwareverde.bitcoin.rpc.RpcNotificationType;
+import com.softwareverde.bitcoin.rpc.core.zmq.ZmqMessageTypeConverter;
 import com.softwareverde.bitcoin.server.database.BatchRunner;
 import com.softwareverde.constable.bytearray.ByteArray;
 import com.softwareverde.constable.bytearray.MutableByteArray;
@@ -10,10 +13,8 @@ import com.softwareverde.constable.list.mutable.MutableList;
 import com.softwareverde.cryptography.hash.sha256.Sha256Hash;
 import com.softwareverde.guvnor.proxy.node.selector.NodeSelector;
 import com.softwareverde.guvnor.proxy.rpc.RpcConfiguration;
-import com.softwareverde.guvnor.proxy.rpc.connector.BitcoinRpcConnector;
-import com.softwareverde.guvnor.proxy.rpc.connector.BlockTemplate;
+import com.softwareverde.guvnor.proxy.rpc.connector.GuvnorRpcConnector;
 import com.softwareverde.guvnor.proxy.zmq.ZmqConfiguration;
-import com.softwareverde.guvnor.proxy.zmq.ZmqMessageTypeConverter;
 import com.softwareverde.http.server.servlet.Servlet;
 import com.softwareverde.http.server.servlet.request.Request;
 import com.softwareverde.http.server.servlet.response.Response;
@@ -69,7 +70,7 @@ public class RpcProxyHandler implements Servlet {
                 @Override
                 public void run(final List<RpcConfiguration> batchItems) throws Exception {
                     final RpcConfiguration rpcConfiguration = batchItems.get(0);
-                    final BitcoinRpcConnector bitcoinRpcConnector = rpcConfiguration.getBitcoinRpcConnector();
+                    final GuvnorRpcConnector bitcoinRpcConnector = rpcConfiguration.getBitcoinRpcConnector();
 
                     final Boolean wasSuccess = bitcoinRpcConnector.submitBlock(block);
                     if (wasSuccess) {
@@ -180,7 +181,7 @@ public class RpcProxyHandler implements Servlet {
             {
                 final Json zmqEndpointsJson = new Json(true);
                 if (_zmqConfiguration != null) {
-                    for (final NotificationType notificationType : _zmqConfiguration.getSupportedMessageTypes()) {
+                    for (final RpcNotificationType notificationType : _zmqConfiguration.getSupportedMessageTypes()) {
                         final Integer listenPort = _zmqConfiguration.getPort(notificationType);
                         final Json endpointConfiguration = new Json(false);
                         endpointConfiguration.put("type", ZmqMessageTypeConverter.toPublishString(notificationType));
@@ -216,7 +217,7 @@ public class RpcProxyHandler implements Servlet {
             // Prevent trying the same node multiple times with the same request.
             attemptedConfigurations.add(rpcConfiguration);
 
-            final BitcoinRpcConnector bitcoinRpcConnector = rpcConfiguration.getBitcoinRpcConnector();
+            final GuvnorRpcConnector bitcoinRpcConnector = rpcConfiguration.getBitcoinRpcConnector();
             Logger.debug("Routing: " + rawMethod + " to " + rpcConfiguration + ".");
 
             nanoTimer.start();
@@ -224,7 +225,7 @@ public class RpcProxyHandler implements Servlet {
             nanoTimer.stop();
 
             final Container<String> errorStringContainer = new Container<>();
-            final Boolean responseWasSuccessful = bitcoinRpcConnector.isSuccessfulResponse(response, null, errorStringContainer);
+            final Boolean responseWasSuccessful = bitcoinRpcConnector.isSuccessfulResponse(response, errorStringContainer);
             Logger.debug("Response received for " + rawMethod + " from " + rpcConfiguration + " in " + nanoTimer.getMillisecondsElapsed() + "ms.");
 
             if (responseWasSuccessful) {

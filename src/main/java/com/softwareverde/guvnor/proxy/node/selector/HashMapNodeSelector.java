@@ -1,10 +1,10 @@
 package com.softwareverde.guvnor.proxy.node.selector;
 
+import com.softwareverde.bitcoin.rpc.RpcNotificationType;
 import com.softwareverde.constable.list.List;
-import com.softwareverde.guvnor.proxy.NotificationType;
 import com.softwareverde.guvnor.proxy.rpc.ChainHeight;
 import com.softwareverde.guvnor.proxy.rpc.RpcConfiguration;
-import com.softwareverde.guvnor.proxy.rpc.connector.BitcoinRpcConnector;
+import com.softwareverde.guvnor.proxy.rpc.connector.GuvnorRpcConnector;
 import com.softwareverde.logging.Logger;
 
 public class HashMapNodeSelector implements NodeSelector {
@@ -14,7 +14,7 @@ public class HashMapNodeSelector implements NodeSelector {
         return _selectBestRpcConfiguration(null, null);
     }
 
-    protected RpcConfiguration _selectBestRpcConfiguration(final NotificationType requiredNotificationType) {
+    protected RpcConfiguration _selectBestRpcConfiguration(final RpcNotificationType requiredNotificationType) {
         return _selectBestRpcConfiguration(requiredNotificationType, null);
     }
 
@@ -22,7 +22,7 @@ public class HashMapNodeSelector implements NodeSelector {
         return _selectBestRpcConfiguration(null, excludedConfigurations);
     }
 
-    protected RpcConfiguration _selectBestRpcConfiguration(final NotificationType requiredNotificationType, final List<RpcConfiguration> excludedConfigurations) {
+    protected RpcConfiguration _selectBestRpcConfiguration(final RpcNotificationType requiredNotificationType, final List<RpcConfiguration> excludedConfigurations) {
         int bestHierarchy = Integer.MAX_VALUE;
         ChainHeight bestChainHeight = ChainHeight.UNKNOWN_CHAIN_HEIGHT;
         RpcConfiguration bestRpcConfiguration = null;
@@ -31,7 +31,7 @@ public class HashMapNodeSelector implements NodeSelector {
             final ChainHeight chainHeight = rpcConfiguration.getChainHeight();
 
             if (requiredNotificationType != null) {
-                final BitcoinRpcConnector bitcoinRpcConnector = rpcConfiguration.getBitcoinRpcConnector();
+                final GuvnorRpcConnector bitcoinRpcConnector = rpcConfiguration.getBitcoinRpcConnector();
                 final boolean hasNotificationType = bitcoinRpcConnector.supportsNotification(requiredNotificationType);
                 if (! hasNotificationType) { continue; }
             }
@@ -87,7 +87,7 @@ public class HashMapNodeSelector implements NodeSelector {
     }
 
     @Override
-    public RpcConfiguration selectBestNode(final NotificationType requiredNotificationType) {
+    public RpcConfiguration selectBestNode(final RpcNotificationType requiredNotificationType) {
         return _selectBestRpcConfiguration(requiredNotificationType);
     }
 

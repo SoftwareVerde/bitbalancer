@@ -1,5 +1,7 @@
 package com.softwareverde.guvnor.proxy;
 
+import com.softwareverde.bitcoin.rpc.RpcNotification;
+import com.softwareverde.bitcoin.rpc.RpcNotificationType;
 import com.softwareverde.bitcoin.util.Util;
 import com.softwareverde.constable.bytearray.ByteArray;
 import com.softwareverde.constable.bytearray.MutableByteArray;
@@ -17,18 +19,18 @@ public class NotifyEndpoint implements Servlet {
     public interface Context {
         RpcConfiguration getBestRpcConfiguration();
         List<RpcConfiguration> getRpcConfigurations();
-        void relayNotification(Notification notification);
+        void relayNotification(RpcNotification notification);
     }
 
     protected final Context _context;
-    protected final NotificationType _notificationType;
+    protected final RpcNotificationType _notificationType;
     protected final Integer _requiredDataLength;
 
-    public NotifyEndpoint(final NotificationType notificationType, final Context context) {
+    public NotifyEndpoint(final RpcNotificationType notificationType, final Context context) {
         this(notificationType, context, null);
     }
 
-    public NotifyEndpoint(final NotificationType notificationType, final Context context, final Integer requiredDataLength) {
+    public NotifyEndpoint(final RpcNotificationType notificationType, final Context context, final Integer requiredDataLength) {
         _context = context;
         _notificationType = notificationType;
         _requiredDataLength = requiredDataLength;
@@ -86,7 +88,7 @@ public class NotifyEndpoint implements Servlet {
             return errorResponse;
         }
 
-        final Notification notification = new Notification(_notificationType, postData);
+        final RpcNotification notification = new RpcNotification(_notificationType, postData);
         _context.relayNotification(notification);
 
         final Response response = new Response();

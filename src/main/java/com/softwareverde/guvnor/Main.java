@@ -1,16 +1,17 @@
 package com.softwareverde.guvnor;
 
+import com.softwareverde.bitcoin.rpc.BitcoinNodeRpcAddress;
+import com.softwareverde.bitcoin.rpc.RpcCredentials;
+import com.softwareverde.bitcoin.rpc.RpcNotificationType;
 import com.softwareverde.constable.list.mutable.MutableList;
 import com.softwareverde.guvnor.configuration.Configuration;
 import com.softwareverde.guvnor.configuration.ConfigurationParser;
 import com.softwareverde.guvnor.configuration.NodeProperties;
-import com.softwareverde.guvnor.proxy.NotificationType;
 import com.softwareverde.guvnor.proxy.RpcProxyServer;
 import com.softwareverde.guvnor.proxy.rpc.RpcConfiguration;
-import com.softwareverde.guvnor.proxy.rpc.RpcCredentials;
 import com.softwareverde.guvnor.proxy.rpc.connector.BitcoinCoreRpcConnector;
-import com.softwareverde.guvnor.proxy.rpc.connector.BitcoinRpcConnector;
 import com.softwareverde.guvnor.proxy.rpc.connector.BitcoinVerdeRpcConnector;
+import com.softwareverde.guvnor.proxy.rpc.connector.GuvnorRpcConnector;
 import com.softwareverde.guvnor.proxy.rpc.connector.NoValidationBitcoinCoreRpcConnector;
 import com.softwareverde.guvnor.proxy.zmq.ZmqConfigurationCore;
 import com.softwareverde.logging.LineNumberAnnotatedLog;
@@ -65,9 +66,9 @@ public class Main {
                 final String host = nodeProperties.getHost();
                 final Integer port = nodeProperties.getPort();
                 final Long maxTimeoutMs = nodeProperties.getMaxTimeoutMs();
-                final BitcoinNodeAddress bitcoinNodeAddress = new BitcoinNodeAddress(host, port, nodeProperties.isSecure());
+                final BitcoinNodeRpcAddress bitcoinNodeAddress = new BitcoinNodeRpcAddress(host, port, nodeProperties.isSecure());
                 final RpcCredentials rpcCredentials = new RpcCredentials(nodeProperties.getRpcUsername(), nodeProperties.getRpcPassword());
-                final BitcoinRpcConnector bitcoinRpcConnector;
+                final GuvnorRpcConnector bitcoinRpcConnector;
                 {
                     final String connectorIdentifier = nodeProperties.getConnectorIdentifier();;
                     switch (connectorIdentifier) {
@@ -82,8 +83,8 @@ public class Main {
                         case BitcoinCoreRpcConnector.IDENTIFIER:
                         default: {
                             final BitcoinCoreRpcConnector bitcoinCoreRpcConnector = new BitcoinCoreRpcConnector(bitcoinNodeAddress, rpcCredentials);
-                            final Map<NotificationType, String> zmqEndpoints = BitcoinCoreRpcConnector.getZmqEndpoints(host, nodeProperties.getZmqPorts());
-                            for (final NotificationType notificationType : zmqEndpoints.keySet()) {
+                            final Map<RpcNotificationType, String> zmqEndpoints = BitcoinCoreRpcConnector.getZmqEndpoints(host, nodeProperties.getZmqPorts());
+                            for (final RpcNotificationType notificationType : zmqEndpoints.keySet()) {
                                 final String endpointUri = zmqEndpoints.get(notificationType);
                                 bitcoinCoreRpcConnector.setZmqEndpoint(notificationType, endpointUri);
                             }
@@ -101,7 +102,7 @@ public class Main {
         }
 
         final ZmqConfigurationCore zmqConfiguration = new ZmqConfigurationCore();
-        for (final NotificationType notificationType : NotificationType.values()) {
+        for (final RpcNotificationType notificationType : RpcNotificationType.values()) {
             final Integer zmqPort = configuration.getZmqPort(notificationType);
             zmqConfiguration.setPort(notificationType, zmqPort);
         }

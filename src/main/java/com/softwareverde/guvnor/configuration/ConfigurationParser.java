@@ -1,8 +1,8 @@
 package com.softwareverde.guvnor.configuration;
 
+import com.softwareverde.bitcoin.rpc.RpcNotificationType;
 import com.softwareverde.constable.list.mutable.MutableList;
 import com.softwareverde.guvnor.Main;
-import com.softwareverde.guvnor.proxy.NotificationType;
 import com.softwareverde.guvnor.proxy.rpc.connector.BitcoinCoreRpcConnector;
 import com.softwareverde.guvnor.proxy.rpc.connector.BitcoinVerdeRpcConnector;
 import com.softwareverde.guvnor.proxy.rpc.connector.NoValidationBitcoinCoreRpcConnector;
@@ -16,7 +16,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class ConfigurationParser {
-    protected void _extractZmqProperty(final String zmqKeyString, final Json sourceJson, final NotificationType notificationType, final Map<NotificationType, Integer> destinationMap) {
+    protected void _extractZmqProperty(final String zmqKeyString, final Json sourceJson, final RpcNotificationType notificationType, final Map<RpcNotificationType, Integer> destinationMap) {
         if (! sourceJson.hasKey(zmqKeyString)) { return; }
         final Integer zmqPort = sourceJson.getInteger(zmqKeyString);
 
@@ -47,15 +47,15 @@ public class ConfigurationParser {
             final String rpcPassword = nodeJson.getString("rpcPassword");
             final Long maxTimeoutMs = nodeJson.getLong("maxTimeoutMs");
 
-            final Map<NotificationType, Integer> nodeZmqPorts;
+            final Map<RpcNotificationType, Integer> nodeZmqPorts;
             { // Parse Node ZMQ ports...
-                final HashMap<NotificationType, Integer> portMap = new HashMap<>();
+                final HashMap<RpcNotificationType, Integer> portMap = new HashMap<>();
                 if (json.hasKey("zmqPorts")) {
                     final Json nodeZmqPortsJson = nodeJson.get("zmqPorts");
-                    _extractZmqProperty("block", nodeZmqPortsJson, NotificationType.BLOCK, portMap);
-                    _extractZmqProperty("blockHash", nodeZmqPortsJson, NotificationType.BLOCK_HASH, portMap);
-                    _extractZmqProperty("transaction", nodeZmqPortsJson, NotificationType.TRANSACTION, portMap);
-                    _extractZmqProperty("transactionHash", nodeZmqPortsJson, NotificationType.TRANSACTION_HASH, portMap);
+                    _extractZmqProperty("block", nodeZmqPortsJson, RpcNotificationType.BLOCK, portMap);
+                    _extractZmqProperty("blockHash", nodeZmqPortsJson, RpcNotificationType.BLOCK_HASH, portMap);
+                    _extractZmqProperty("transaction", nodeZmqPortsJson, RpcNotificationType.TRANSACTION, portMap);
+                    _extractZmqProperty("transactionHash", nodeZmqPortsJson, RpcNotificationType.TRANSACTION_HASH, portMap);
                 }
                 nodeZmqPorts = (portMap.isEmpty() ? null : portMap);
             }
@@ -80,15 +80,15 @@ public class ConfigurationParser {
             nodePropertiesList.add(nodeProperties);
         }
 
-        final Map<NotificationType, Integer> serverZmqPorts;
+        final Map<RpcNotificationType, Integer> serverZmqPorts;
         { // Parse Server external ZMQ ports...
-            final HashMap<NotificationType, Integer> portMap = new HashMap<>();
+            final HashMap<RpcNotificationType, Integer> portMap = new HashMap<>();
             if (json.hasKey("zmqPorts")) {
                 final Json zmqPortsJson = json.get("zmqPorts");
-                _extractZmqProperty("block", zmqPortsJson, NotificationType.BLOCK, portMap);
-                _extractZmqProperty("blockHash", zmqPortsJson, NotificationType.BLOCK_HASH, portMap);
-                _extractZmqProperty("transaction", zmqPortsJson, NotificationType.TRANSACTION, portMap);
-                _extractZmqProperty("transactionHash", zmqPortsJson, NotificationType.TRANSACTION_HASH, portMap);
+                _extractZmqProperty("block", zmqPortsJson, RpcNotificationType.BLOCK, portMap);
+                _extractZmqProperty("blockHash", zmqPortsJson, RpcNotificationType.BLOCK_HASH, portMap);
+                _extractZmqProperty("transaction", zmqPortsJson, RpcNotificationType.TRANSACTION, portMap);
+                _extractZmqProperty("transactionHash", zmqPortsJson, RpcNotificationType.TRANSACTION_HASH, portMap);
             }
             serverZmqPorts = (portMap.isEmpty() ? null : portMap);
         }

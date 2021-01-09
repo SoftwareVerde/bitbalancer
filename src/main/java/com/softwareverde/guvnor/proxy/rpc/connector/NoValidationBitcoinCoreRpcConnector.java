@@ -1,22 +1,19 @@
 package com.softwareverde.guvnor.proxy.rpc.connector;
 
-import com.softwareverde.guvnor.BitcoinNodeAddress;
-import com.softwareverde.guvnor.proxy.rpc.RpcCredentials;
+import com.softwareverde.bitcoin.rpc.BitcoinNodeRpcAddress;
+import com.softwareverde.bitcoin.rpc.BlockTemplate;
+import com.softwareverde.bitcoin.rpc.RpcCredentials;
+import com.softwareverde.bitcoin.rpc.monitor.Monitor;
 
 public class NoValidationBitcoinCoreRpcConnector extends BitcoinCoreRpcConnector {
     public static final String IDENTIFIER = "NO_VALIDATE";
 
-    public NoValidationBitcoinCoreRpcConnector(final BitcoinNodeAddress bitcoinNodeAddress, final RpcCredentials rpcCredentials) {
+    public NoValidationBitcoinCoreRpcConnector(final BitcoinNodeRpcAddress bitcoinNodeAddress, final RpcCredentials rpcCredentials) {
         super(bitcoinNodeAddress, rpcCredentials);
     }
 
     @Override
     public Boolean validateBlockTemplate(final BlockTemplate blockTemplate, final Monitor monitor) {
-        if (monitor instanceof BitcoinCoreRpcMonitor) {
-            ((BitcoinCoreRpcMonitor) monitor).beforeRequestStart(null);
-            ((BitcoinCoreRpcMonitor) monitor).afterRequestEnd();
-        }
-
         return null;
     }
 }

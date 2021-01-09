@@ -1,13 +1,16 @@
 package com.softwareverde.guvnor.proxy.rpc.connector;
 
 import com.softwareverde.bitcoin.block.Block;
-import com.softwareverde.guvnor.proxy.NotificationType;
+import com.softwareverde.bitcoin.rpc.BlockTemplate;
+import com.softwareverde.bitcoin.rpc.RpcNotificationCallback;
+import com.softwareverde.bitcoin.rpc.RpcNotificationType;
+import com.softwareverde.bitcoin.rpc.monitor.Monitor;
 import com.softwareverde.guvnor.proxy.rpc.ChainHeight;
-import com.softwareverde.guvnor.proxy.rpc.NotificationCallback;
 import com.softwareverde.http.server.servlet.request.Request;
 import com.softwareverde.http.server.servlet.response.Response;
+import com.softwareverde.util.Container;
 
-public class FakeBitcoinRpcConnector implements BitcoinRpcConnector {
+public class FakeBitcoinRpcConnector implements GuvnorRpcConnector {
     protected final String _host;
     protected final Integer _port;
     protected ChainHeight _chainHeight = ChainHeight.UNKNOWN_CHAIN_HEIGHT;
@@ -59,6 +62,11 @@ public class FakeBitcoinRpcConnector implements BitcoinRpcConnector {
     }
 
     @Override
+    public Boolean isSuccessfulResponse(final Response response, final Container<String> errorStringContainer) {
+        return null;
+    }
+
+    @Override
     public BlockTemplate getBlockTemplate(final Monitor monitor) {
         return null;
     }
@@ -79,12 +87,12 @@ public class FakeBitcoinRpcConnector implements BitcoinRpcConnector {
     }
 
     @Override
-    public Boolean supportsNotification(final NotificationType notificationType) {
+    public Boolean supportsNotification(final RpcNotificationType notificationType) {
         return false;
     }
 
     @Override
-    public void subscribeToNotifications(final NotificationCallback notificationCallback) { }
+    public void subscribeToNotifications(final RpcNotificationCallback notificationCallback) { }
 
     @Override
     public void unsubscribeToNotifications() { }
