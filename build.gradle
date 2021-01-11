@@ -51,9 +51,9 @@ task copyDependencies(type: Copy) {
 
 task makeJar(type: Jar) {
     manifest {
-        attributes  'Implementation-Title': 'Bitcoin Guvnor',
+        attributes  'Implementation-Title': 'Bitbalancer',
                     'Implementation-Version': archiveVersion,
-                    'Main-Class': 'com.softwareverde.guvnor.Main',
+                    'Main-Class': 'com.softwareverde.bitbalancer.Main',
                     'Class-Path': (project.configurations.compileClasspath + configurations.runtimeClasspath).collect { 'libs/' + it.getName() }.join(' ')
     }
 
