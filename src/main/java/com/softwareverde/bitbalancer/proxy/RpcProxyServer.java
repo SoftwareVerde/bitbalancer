@@ -168,10 +168,10 @@ public class RpcProxyServer {
         bitcoinRpcConnector.subscribeToNotifications(callback);
     }
 
-    public RpcProxyServer(final Integer port, final List<RpcConfiguration> rpcConfigurations, final ZmqConfiguration zmqConfiguration, final Long blockTemplateCacheDuration) {
+    public RpcProxyServer(final Integer port, final List<RpcConfiguration> rpcConfigurations, final ZmqConfiguration zmqConfiguration, final Long blockTemplateCacheDuration, final Long maxOrphanDepth) {
         _port = port;
         _rpcConfigurations = rpcConfigurations.asConst();
-        _nodeSelector = new HashMapNodeSelector(_rpcConfigurations);
+        _nodeSelector = new HashMapNodeSelector(_rpcConfigurations, maxOrphanDepth);
 
         if (Util.coalesce(blockTemplateCacheDuration) > 0L) {
             final CachingBlockTemplateManager blockTemplateManager = new CachingBlockTemplateManager(_nodeSelector);

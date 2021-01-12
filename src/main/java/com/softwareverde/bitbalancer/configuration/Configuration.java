@@ -11,14 +11,16 @@ public class Configuration {
     protected final List<NodeProperties> _nodeProperties;
     protected final HashMap<RpcNotificationType, Integer> _zmqPorts = new HashMap<>();
     protected final Long _blockTemplateCacheDuration;
+    protected final Long _maxOrphanDepth;
 
-    protected Configuration(final Integer rpcPort, final List<NodeProperties> nodeProperties, final Map<RpcNotificationType, Integer> zmqPorts, final Long blockTemplateCacheDuration) {
+    protected Configuration(final Integer rpcPort, final List<NodeProperties> nodeProperties, final Map<RpcNotificationType, Integer> zmqPorts, final Long blockTemplateCacheDuration, final Long maxOrphanDepth) {
         _rpcPort = rpcPort;
         _nodeProperties = nodeProperties;
         if (zmqPorts != null) {
             _zmqPorts.putAll(zmqPorts);
         }
         _blockTemplateCacheDuration = blockTemplateCacheDuration;
+        _maxOrphanDepth = maxOrphanDepth;
     }
 
     public Integer getRpcPort() {
@@ -35,5 +37,9 @@ public class Configuration {
 
     public Long getBlockTemplateCacheDuration() {
         return _blockTemplateCacheDuration;
+    }
+
+    public Long getMaxOrphanDepth() {
+        return _maxOrphanDepth;
     }
 }

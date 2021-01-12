@@ -65,4 +65,84 @@ public class ChainHeightTests {
         // Assert
         Assert.assertFalse(isBetterChainHeight);
     }
+
+    @Test
+    public void chain_height_should_be_better_by_height_amounts_with_greater_chain_work() {
+        // Setup
+        final ChainHeight lesserChainHeight = new ChainHeight(667854L,  ChainWork.fromHexString("00000000000000000000000000000000000000000158CE7A2EA55FF4C8ACA055"));
+        final ChainHeight bestChainHeight = new ChainHeight(667855L,    ChainWork.fromHexString("00000000000000000000000000000000000000000158CEB0A0DFAA0B3411D4DA")); // Better BlockHeight (+1), better ChainWork.
+
+        // Action
+        final boolean isBetterChainHeight = bestChainHeight.isBetterThan(lesserChainHeight); // byHeight is disabled...
+        final boolean isBetterChainHeightByZero = bestChainHeight.isBetterThan(lesserChainHeight, 0); // byHeight is disabled...
+        final boolean isBetterChainHeightByOne = bestChainHeight.isBetterThan(lesserChainHeight, 1);
+        final boolean isBetterChainHeightByTwo = bestChainHeight.isBetterThan(lesserChainHeight, 2);
+
+        // Assert
+        Assert.assertTrue(isBetterChainHeight);
+        Assert.assertTrue(isBetterChainHeightByZero);
+        Assert.assertTrue(isBetterChainHeightByOne);
+        Assert.assertFalse(isBetterChainHeightByTwo);
+    }
+
+    @Test
+    public void chain_height_should_be_better_by_height_amounts_with_greater_chain_work_v2() {
+        // Setup
+        final ChainHeight lesserChainHeight = new ChainHeight(667854L,  ChainWork.fromHexString("00000000000000000000000000000000000000000158CE7A2EA55FF4C8ACA055"));
+        final ChainHeight bestChainHeight = new ChainHeight(667856L,    ChainWork.fromHexString("00000000000000000000000000000000000000000158CEB0A0DFAA0B3411D4DA"));
+
+        // Action
+        final boolean isBetterChainHeight = bestChainHeight.isBetterThan(lesserChainHeight); // byHeight is disabled...
+        final boolean isBetterChainHeightByZero = bestChainHeight.isBetterThan(lesserChainHeight, 0); // byHeight is disabled...
+        final boolean isBetterChainHeightByOne = bestChainHeight.isBetterThan(lesserChainHeight, 1);
+        final boolean isBetterChainHeightByTwo = bestChainHeight.isBetterThan(lesserChainHeight, 2); // "Is the bestChainHeight two blocks ahead of our current chainHeight?" (assuming greater ChainWork)
+        final boolean isBetterChainHeightByThree = bestChainHeight.isBetterThan(lesserChainHeight, 3);
+
+        // Assert
+        Assert.assertTrue(isBetterChainHeight);
+        Assert.assertTrue(isBetterChainHeightByZero);
+        Assert.assertTrue(isBetterChainHeightByOne);
+        Assert.assertTrue(isBetterChainHeightByTwo); // "The bestChainHeight is 2 blocks ahead of the current chainHeight."
+        Assert.assertFalse(isBetterChainHeightByThree); // "The bestChainHeight is not 3 blocks ahead of the current chainHeight."
+    }
+
+    @Test
+    public void chain_height_should_be_better_by_height_amounts_with_null_chain_work() {
+        // Setup
+        final ChainHeight lesserChainHeight = new ChainHeight(667854L,  ChainWork.fromHexString("00000000000000000000000000000000000000000158CE7A2EA55FF4C8ACA055"));
+        final ChainHeight bestChainHeight = new ChainHeight(667855L,    null);
+
+        // Action
+        final boolean isBetterChainHeight = bestChainHeight.isBetterThan(lesserChainHeight); // byHeight is disabled...
+        final boolean isBetterChainHeightByZero = bestChainHeight.isBetterThan(lesserChainHeight, 0); // byHeight is disabled...
+        final boolean isBetterChainHeightByOne = bestChainHeight.isBetterThan(lesserChainHeight, 1);
+        final boolean isBetterChainHeightByTwo = bestChainHeight.isBetterThan(lesserChainHeight, 2);
+
+        // Assert
+        Assert.assertTrue(isBetterChainHeight);
+        Assert.assertTrue(isBetterChainHeightByZero);
+        Assert.assertTrue(isBetterChainHeightByOne);
+        Assert.assertFalse(isBetterChainHeightByTwo);
+    }
+
+    @Test
+    public void chain_height_should_be_not_better_by_height_amounts_with_lesser_chain_work_but_greater_height() {
+        // Setup
+        final ChainHeight lesserBlockHeightGreaterChainWork = new ChainHeight(667854L,  ChainWork.fromHexString("00000000000000000000000000000000000000000158CEB0A0DFAA0B3411D4DA"));
+        final ChainHeight greaterBlockHeightLesserChainWork = new ChainHeight(667855L,  ChainWork.fromHexString("00000000000000000000000000000000000000000158CE7A2EA55FF4C8ACA055"));
+
+        // Action
+        final boolean isBetterChainHeight = greaterBlockHeightLesserChainWork.isBetterThan(lesserBlockHeightGreaterChainWork); // byHeight is disabled...
+        final boolean isBetterChainHeightByZero = greaterBlockHeightLesserChainWork.isBetterThan(lesserBlockHeightGreaterChainWork, 0); // byHeight is disabled...
+        final boolean isBetterChainHeightByOne = greaterBlockHeightLesserChainWork.isBetterThan(lesserBlockHeightGreaterChainWork, 1);
+        final boolean isBetterChainHeightByTwo = greaterBlockHeightLesserChainWork.isBetterThan(lesserBlockHeightGreaterChainWork, 2);
+        final boolean isBetterChainHeightByThree = greaterBlockHeightLesserChainWork.isBetterThan(lesserBlockHeightGreaterChainWork, 3);
+
+        // Assert
+        Assert.assertFalse(isBetterChainHeight);
+        Assert.assertFalse(isBetterChainHeightByZero);
+        Assert.assertFalse(isBetterChainHeightByOne);
+        Assert.assertFalse(isBetterChainHeightByTwo);
+        Assert.assertFalse(isBetterChainHeightByThree);
+    }
 }

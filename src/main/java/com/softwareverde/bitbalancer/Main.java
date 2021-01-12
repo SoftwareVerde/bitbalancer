@@ -108,8 +108,9 @@ public class Main {
         }
 
         final Long blockTemplateCacheDuration = configuration.getBlockTemplateCacheDuration();
+        final Long maxOrphanDepth = configuration.getMaxOrphanDepth();
 
-        _rpcProxyServer = new RpcProxyServer(rpcPort, rpcConfigurations, zmqConfiguration, blockTemplateCacheDuration);
+        _rpcProxyServer = new RpcProxyServer(rpcPort, rpcConfigurations, zmqConfiguration, blockTemplateCacheDuration, maxOrphanDepth);
     }
 
     public void run() {

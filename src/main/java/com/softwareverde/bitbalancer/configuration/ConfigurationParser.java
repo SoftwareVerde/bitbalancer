@@ -36,6 +36,8 @@ public class ConfigurationParser {
             return null;
         }
 
+        final Long maxOrphanDepth = json.getLong("maxOrphanDepth");
+
         final MutableList<NodeProperties> nodePropertiesList = new MutableList<>();
         for (int i = 0; i < nodesJson.length(); ++i) {
             final Json nodeJson = nodesJson.get(i);
@@ -95,7 +97,7 @@ public class ConfigurationParser {
 
         final Long blockTemplateCacheDuration = json.getOrNull("cacheTemplateDuration", Json.Types.LONG);
 
-        return new Configuration(rpcPort, nodePropertiesList, serverZmqPorts, blockTemplateCacheDuration);
+        return new Configuration(rpcPort, nodePropertiesList, serverZmqPorts, blockTemplateCacheDuration, maxOrphanDepth);
     }
 
     public Configuration parseConfigurationFile(final String fileName) {

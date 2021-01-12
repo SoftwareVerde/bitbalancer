@@ -9,6 +9,7 @@ import com.softwareverde.logging.Logger;
 
 public class HashMapNodeSelector implements NodeSelector {
     protected final List<RpcConfiguration> _rpcConfigurations;
+    protected final Long _maxOrphanDepth;
 
     protected RpcConfiguration _selectBestRpcConfiguration() {
         return _selectBestRpcConfiguration(null, null);
@@ -57,7 +58,12 @@ public class HashMapNodeSelector implements NodeSelector {
     }
 
     public HashMapNodeSelector(final List<RpcConfiguration> rpcConfigurations) {
+        this(rpcConfigurations, 0L);
+    }
+
+    public HashMapNodeSelector(final List<RpcConfiguration> rpcConfigurations, final Long maxOrphanDepth) {
         _rpcConfigurations = rpcConfigurations.asConst();
+        _maxOrphanDepth = maxOrphanDepth;
     }
 
     @Override
