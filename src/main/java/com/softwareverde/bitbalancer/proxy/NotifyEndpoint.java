@@ -1,5 +1,6 @@
 package com.softwareverde.bitbalancer.proxy;
 
+import com.softwareverde.bitbalancer.proxy.rpc.RpcConfiguration;
 import com.softwareverde.bitcoin.rpc.RpcNotification;
 import com.softwareverde.bitcoin.rpc.RpcNotificationType;
 import com.softwareverde.bitcoin.util.Util;
@@ -7,7 +8,6 @@ import com.softwareverde.constable.bytearray.ByteArray;
 import com.softwareverde.constable.bytearray.MutableByteArray;
 import com.softwareverde.constable.list.List;
 import com.softwareverde.cryptography.hash.sha256.Sha256Hash;
-import com.softwareverde.bitbalancer.proxy.rpc.RpcConfiguration;
 import com.softwareverde.http.HttpMethod;
 import com.softwareverde.http.querystring.PostParameters;
 import com.softwareverde.http.server.servlet.Servlet;

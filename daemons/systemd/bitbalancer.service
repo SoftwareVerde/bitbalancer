@@ -1,0 +1,12 @@
+[Unit]
+Description=BitBalancer
+
+[Service]
+Type=simple
+User=bitbalancer
+WorkingDirectory=/opt/bitbalancer/
+ExecStart=/opt/bitbalancer/run.sh
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

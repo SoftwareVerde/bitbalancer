@@ -1,14 +1,14 @@
 package com.softwareverde.bitbalancer.proxy;
 
+import com.softwareverde.bitbalancer.proxy.node.selector.NodeSelector;
+import com.softwareverde.bitbalancer.proxy.rpc.ChainHeight;
+import com.softwareverde.bitbalancer.proxy.rpc.RpcConfiguration;
+import com.softwareverde.bitbalancer.proxy.rpc.connector.BitBalancerRpcConnector;
 import com.softwareverde.bitcoin.rpc.BlockTemplate;
 import com.softwareverde.bitcoin.rpc.monitor.Monitor;
 import com.softwareverde.bitcoin.server.database.BatchRunner;
 import com.softwareverde.bitcoin.util.Util;
 import com.softwareverde.constable.list.List;
-import com.softwareverde.bitbalancer.proxy.node.selector.NodeSelector;
-import com.softwareverde.bitbalancer.proxy.rpc.ChainHeight;
-import com.softwareverde.bitbalancer.proxy.rpc.RpcConfiguration;
-import com.softwareverde.bitbalancer.proxy.rpc.connector.BitBalancerRpcConnector;
 import com.softwareverde.logging.Logger;
 import com.softwareverde.util.Container;
 import com.softwareverde.util.timer.NanoTimer;

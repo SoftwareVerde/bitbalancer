@@ -1,11 +1,11 @@
 package com.softwareverde.bitbalancer.proxy.rpc.connector;
 
+import com.softwareverde.bitbalancer.proxy.rpc.ChainHeight;
 import com.softwareverde.bitcoin.block.Block;
 import com.softwareverde.bitcoin.rpc.BlockTemplate;
 import com.softwareverde.bitcoin.rpc.RpcNotificationCallback;
 import com.softwareverde.bitcoin.rpc.RpcNotificationType;
 import com.softwareverde.bitcoin.rpc.monitor.Monitor;
-import com.softwareverde.bitbalancer.proxy.rpc.ChainHeight;
 import com.softwareverde.http.server.servlet.request.Request;
 import com.softwareverde.http.server.servlet.response.Response;
 import com.softwareverde.util.Container;

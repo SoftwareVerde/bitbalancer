@@ -1,11 +1,11 @@
 package com.softwareverde.bitbalancer.configuration;
 
-import com.softwareverde.bitcoin.rpc.RpcNotificationType;
-import com.softwareverde.constable.list.mutable.MutableList;
 import com.softwareverde.bitbalancer.Main;
+import com.softwareverde.bitbalancer.proxy.rpc.connector.BchdRpcConnector;
 import com.softwareverde.bitbalancer.proxy.rpc.connector.BitcoinCoreRpcConnector;
 import com.softwareverde.bitbalancer.proxy.rpc.connector.BitcoinVerdeRpcConnector;
-import com.softwareverde.bitbalancer.proxy.rpc.connector.NoValidationBitcoinCoreRpcConnector;
+import com.softwareverde.bitcoin.rpc.RpcNotificationType;
+import com.softwareverde.constable.list.mutable.MutableList;
 import com.softwareverde.json.Json;
 import com.softwareverde.logging.Logger;
 import com.softwareverde.util.IoUtil;
@@ -66,7 +66,7 @@ public class ConfigurationParser {
                 switch (identifier) {
                     case BitcoinCoreRpcConnector.IDENTIFIER:
                     case BitcoinVerdeRpcConnector.IDENTIFIER:
-                    case NoValidationBitcoinCoreRpcConnector.IDENTIFIER: {
+                    case BchdRpcConnector.IDENTIFIER: {
                         connectorIdentifier = identifier;
                     } break;
 

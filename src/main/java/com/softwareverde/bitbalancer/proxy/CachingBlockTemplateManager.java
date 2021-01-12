@@ -1,5 +1,8 @@
 package com.softwareverde.bitbalancer.proxy;
 
+import com.softwareverde.bitbalancer.proxy.node.selector.NodeSelector;
+import com.softwareverde.bitbalancer.proxy.rpc.ChainHeight;
+import com.softwareverde.bitbalancer.proxy.rpc.connector.BitcoinVerdeRpcConnector;
 import com.softwareverde.bitcoin.block.Block;
 import com.softwareverde.bitcoin.block.MutableBlock;
 import com.softwareverde.bitcoin.block.header.BlockHeader;
@@ -9,9 +12,6 @@ import com.softwareverde.bitcoin.block.validator.difficulty.AsertDifficultyCalcu
 import com.softwareverde.bitcoin.block.validator.difficulty.AsertReferenceBlock;
 import com.softwareverde.bitcoin.rpc.BlockTemplate;
 import com.softwareverde.bitcoin.server.main.BitcoinConstants;
-import com.softwareverde.bitbalancer.proxy.node.selector.NodeSelector;
-import com.softwareverde.bitbalancer.proxy.rpc.ChainHeight;
-import com.softwareverde.bitbalancer.proxy.rpc.connector.BitcoinVerdeRpcConnector;
 import com.softwareverde.logging.Logger;
 import com.softwareverde.util.type.time.SystemTime;
 

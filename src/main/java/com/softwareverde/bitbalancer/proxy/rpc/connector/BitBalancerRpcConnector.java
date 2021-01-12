@@ -1,8 +1,8 @@
 package com.softwareverde.bitbalancer.proxy.rpc.connector;
 
+import com.softwareverde.bitbalancer.proxy.rpc.ChainHeight;
 import com.softwareverde.bitcoin.rpc.BitcoinMiningRpcConnector;
 import com.softwareverde.bitcoin.rpc.monitor.Monitor;
-import com.softwareverde.bitbalancer.proxy.rpc.ChainHeight;
 import com.softwareverde.http.server.servlet.response.Response;
 import com.softwareverde.util.Container;
 

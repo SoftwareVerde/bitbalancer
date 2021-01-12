@@ -16,7 +16,7 @@
         "transaction": 28334,
         "transactionHash": 28331
       },
-      "connector": "DEFAULT"
+      "connector": "CORE"
     }
   ],
   "zmqPorts": {

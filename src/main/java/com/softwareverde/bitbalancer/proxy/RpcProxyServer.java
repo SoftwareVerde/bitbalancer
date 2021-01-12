@@ -1,5 +1,12 @@
 package com.softwareverde.bitbalancer.proxy;
 
+import com.softwareverde.bitbalancer.proxy.node.selector.HashMapNodeSelector;
+import com.softwareverde.bitbalancer.proxy.node.selector.NodeSelector;
+import com.softwareverde.bitbalancer.proxy.rpc.ChainHeight;
+import com.softwareverde.bitbalancer.proxy.rpc.RpcConfiguration;
+import com.softwareverde.bitbalancer.proxy.rpc.connector.BitBalancerRpcConnector;
+import com.softwareverde.bitbalancer.proxy.zmq.ZmqConfiguration;
+import com.softwareverde.bitbalancer.proxy.zmq.ZmqNotificationPublisherThread;
 import com.softwareverde.bitcoin.block.header.BlockHeader;
 import com.softwareverde.bitcoin.block.header.BlockHeaderInflater;
 import com.softwareverde.bitcoin.rpc.RpcNotification;
@@ -10,13 +17,6 @@ import com.softwareverde.concurrent.service.SleepyService;
 import com.softwareverde.constable.bytearray.ByteArray;
 import com.softwareverde.constable.list.List;
 import com.softwareverde.cryptography.hash.sha256.Sha256Hash;
-import com.softwareverde.bitbalancer.proxy.node.selector.HashMapNodeSelector;
-import com.softwareverde.bitbalancer.proxy.node.selector.NodeSelector;
-import com.softwareverde.bitbalancer.proxy.rpc.ChainHeight;
-import com.softwareverde.bitbalancer.proxy.rpc.RpcConfiguration;
-import com.softwareverde.bitbalancer.proxy.rpc.connector.BitBalancerRpcConnector;
-import com.softwareverde.bitbalancer.proxy.zmq.ZmqConfiguration;
-import com.softwareverde.bitbalancer.proxy.zmq.ZmqNotificationPublisherThread;
 import com.softwareverde.http.server.HttpServer;
 import com.softwareverde.http.server.endpoint.Endpoint;
 import com.softwareverde.logging.Logger;

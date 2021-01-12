@@ -1,11 +1,11 @@
 package com.softwareverde.bitbalancer.proxy.node.selector;
 
-import com.softwareverde.bitcoin.block.header.difficulty.work.ChainWork;
-import com.softwareverde.constable.list.List;
-import com.softwareverde.constable.list.immutable.ImmutableList;
 import com.softwareverde.bitbalancer.proxy.rpc.ChainHeight;
 import com.softwareverde.bitbalancer.proxy.rpc.RpcConfiguration;
 import com.softwareverde.bitbalancer.proxy.rpc.connector.FakeBitcoinRpcConnector;
+import com.softwareverde.bitcoin.block.header.difficulty.work.ChainWork;
+import com.softwareverde.constable.list.List;
+import com.softwareverde.constable.list.immutable.ImmutableList;
 import org.junit.Assert;
 import org.junit.Test;
 

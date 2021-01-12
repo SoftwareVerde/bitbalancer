@@ -1,5 +1,9 @@
 package com.softwareverde.bitbalancer.proxy;
 
+import com.softwareverde.bitbalancer.proxy.node.selector.NodeSelector;
+import com.softwareverde.bitbalancer.proxy.rpc.RpcConfiguration;
+import com.softwareverde.bitbalancer.proxy.rpc.connector.BitBalancerRpcConnector;
+import com.softwareverde.bitbalancer.proxy.zmq.ZmqConfiguration;
 import com.softwareverde.bitcoin.block.Block;
 import com.softwareverde.bitcoin.block.BlockInflater;
 import com.softwareverde.bitcoin.rpc.BlockTemplate;
@@ -11,10 +15,6 @@ import com.softwareverde.constable.bytearray.MutableByteArray;
 import com.softwareverde.constable.list.List;
 import com.softwareverde.constable.list.mutable.MutableList;
 import com.softwareverde.cryptography.hash.sha256.Sha256Hash;
-import com.softwareverde.bitbalancer.proxy.node.selector.NodeSelector;
-import com.softwareverde.bitbalancer.proxy.rpc.RpcConfiguration;
-import com.softwareverde.bitbalancer.proxy.rpc.connector.BitBalancerRpcConnector;
-import com.softwareverde.bitbalancer.proxy.zmq.ZmqConfiguration;
 import com.softwareverde.http.server.servlet.Servlet;
 import com.softwareverde.http.server.servlet.request.Request;
 import com.softwareverde.http.server.servlet.response.Response;

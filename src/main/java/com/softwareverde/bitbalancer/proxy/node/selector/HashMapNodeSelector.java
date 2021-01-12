@@ -1,10 +1,10 @@
 package com.softwareverde.bitbalancer.proxy.node.selector;
 
-import com.softwareverde.bitcoin.rpc.RpcNotificationType;
-import com.softwareverde.constable.list.List;
 import com.softwareverde.bitbalancer.proxy.rpc.ChainHeight;
 import com.softwareverde.bitbalancer.proxy.rpc.RpcConfiguration;
 import com.softwareverde.bitbalancer.proxy.rpc.connector.BitBalancerRpcConnector;
+import com.softwareverde.bitcoin.rpc.RpcNotificationType;
+import com.softwareverde.constable.list.List;
 import com.softwareverde.logging.Logger;
 
 public class HashMapNodeSelector implements NodeSelector {

@@ -1,5 +1,6 @@
 package com.softwareverde.bitbalancer.proxy.rpc.connector;
 
+import com.softwareverde.bitbalancer.proxy.rpc.ChainHeight;
 import com.softwareverde.bitcoin.block.header.difficulty.work.ChainWork;
 import com.softwareverde.bitcoin.rpc.BitcoinNodeRpcAddress;
 import com.softwareverde.bitcoin.rpc.NodeJsonRpcConnection;
@@ -7,7 +8,6 @@ import com.softwareverde.bitcoin.rpc.RpcCredentials;
 import com.softwareverde.bitcoin.rpc.monitor.Monitor;
 import com.softwareverde.bitcoin.util.StringUtil;
 import com.softwareverde.bitcoin.util.Util;
-import com.softwareverde.bitbalancer.proxy.rpc.ChainHeight;
 import com.softwareverde.http.server.servlet.response.Response;
 import com.softwareverde.json.Json;
 import com.softwareverde.logging.Logger;

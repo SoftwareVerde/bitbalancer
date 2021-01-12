@@ -12,3 +12,6 @@ mkdir -p out/logs
 mkdir -p out/conf
 cp conf/server.json out/conf/.
 
+mkdir -p out/daemons
+cp -R daemons/* out/daemons/.
+

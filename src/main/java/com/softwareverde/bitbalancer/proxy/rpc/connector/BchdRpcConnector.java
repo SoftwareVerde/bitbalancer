@@ -5,10 +5,10 @@ import com.softwareverde.bitcoin.rpc.BlockTemplate;
 import com.softwareverde.bitcoin.rpc.RpcCredentials;
 import com.softwareverde.bitcoin.rpc.monitor.Monitor;
 
-public class NoValidationBitcoinCoreRpcConnector extends BitcoinCoreRpcConnector {
-    public static final String IDENTIFIER = "NO_VALIDATE";
+public class BchdRpcConnector extends BitcoinCoreRpcConnector {
+    public static final String IDENTIFIER = "BCHD";
 
-    public NoValidationBitcoinCoreRpcConnector(final BitcoinNodeRpcAddress bitcoinNodeAddress, final RpcCredentials rpcCredentials) {
+    public BchdRpcConnector(final BitcoinNodeRpcAddress bitcoinNodeAddress, final RpcCredentials rpcCredentials) {
         super(bitcoinNodeAddress, rpcCredentials);
     }
 

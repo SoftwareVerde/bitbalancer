@@ -1,19 +1,19 @@
 package com.softwareverde.bitbalancer;
 
-import com.softwareverde.bitcoin.rpc.BitcoinNodeRpcAddress;
-import com.softwareverde.bitcoin.rpc.RpcCredentials;
-import com.softwareverde.bitcoin.rpc.RpcNotificationType;
-import com.softwareverde.constable.list.mutable.MutableList;
 import com.softwareverde.bitbalancer.configuration.Configuration;
 import com.softwareverde.bitbalancer.configuration.ConfigurationParser;
 import com.softwareverde.bitbalancer.configuration.NodeProperties;
 import com.softwareverde.bitbalancer.proxy.RpcProxyServer;
 import com.softwareverde.bitbalancer.proxy.rpc.RpcConfiguration;
+import com.softwareverde.bitbalancer.proxy.rpc.connector.BchdRpcConnector;
+import com.softwareverde.bitbalancer.proxy.rpc.connector.BitBalancerRpcConnector;
 import com.softwareverde.bitbalancer.proxy.rpc.connector.BitcoinCoreRpcConnector;
 import com.softwareverde.bitbalancer.proxy.rpc.connector.BitcoinVerdeRpcConnector;
-import com.softwareverde.bitbalancer.proxy.rpc.connector.BitBalancerRpcConnector;
-import com.softwareverde.bitbalancer.proxy.rpc.connector.NoValidationBitcoinCoreRpcConnector;
 import com.softwareverde.bitbalancer.proxy.zmq.ZmqConfigurationCore;
+import com.softwareverde.bitcoin.rpc.BitcoinNodeRpcAddress;
+import com.softwareverde.bitcoin.rpc.RpcCredentials;
+import com.softwareverde.bitcoin.rpc.RpcNotificationType;
+import com.softwareverde.constable.list.mutable.MutableList;
 import com.softwareverde.logging.LineNumberAnnotatedLog;
 import com.softwareverde.logging.LogLevel;
 import com.softwareverde.logging.Logger;
@@ -72,8 +72,8 @@ public class Main {
                 {
                     final String connectorIdentifier = nodeProperties.getConnectorIdentifier();;
                     switch (connectorIdentifier) {
-                        case NoValidationBitcoinCoreRpcConnector.IDENTIFIER: {
-                            bitcoinRpcConnector = new NoValidationBitcoinCoreRpcConnector(bitcoinNodeAddress, rpcCredentials);
+                        case BchdRpcConnector.IDENTIFIER: {
+                            bitcoinRpcConnector = new BchdRpcConnector(bitcoinNodeAddress, rpcCredentials);
                         } break;
 
                         case BitcoinVerdeRpcConnector.IDENTIFIER: {
