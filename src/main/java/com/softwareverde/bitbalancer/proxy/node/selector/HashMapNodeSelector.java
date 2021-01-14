@@ -9,7 +9,7 @@ import com.softwareverde.logging.Logger;
 
 public class HashMapNodeSelector implements NodeSelector {
     protected final List<RpcConfiguration> _rpcConfigurations;
-    protected final Long _maxOrphanDepth;
+    protected final Integer _maxOrphanDepth;
 
     protected RpcConfiguration _selectBestRpcConfiguration() {
         return _selectBestRpcConfiguration(null, null);
@@ -28,6 +28,15 @@ public class HashMapNodeSelector implements NodeSelector {
         ChainHeight bestChainHeight = ChainHeight.UNKNOWN_CHAIN_HEIGHT;
         RpcConfiguration bestRpcConfiguration = null;
 
+        // Select the best hierarchical node first in order to prefer it while using _maxOrphanDepth...
+        for (final RpcConfiguration rpcConfiguration : _rpcConfigurations) {
+            final Integer hierarchy = rpcConfiguration.getHierarchy();
+            if (hierarchy <= bestHierarchy) {
+                bestHierarchy = hierarchy;
+                bestRpcConfiguration = rpcConfiguration;
+            }
+        }
+
         for (final RpcConfiguration rpcConfiguration : _rpcConfigurations) {
             final ChainHeight chainHeight = rpcConfiguration.getChainHeight();
 
@@ -37,7 +46,7 @@ public class HashMapNodeSelector implements NodeSelector {
                 if (! hasNotificationType) { continue; }
             }
 
-            final boolean isBetterChainHeight = chainHeight.isBetterThan(bestChainHeight);
+            final boolean isBetterChainHeight = chainHeight.isBetterThan(bestChainHeight, _maxOrphanDepth);
             final boolean areEqualChainHeights = chainHeight.equals(bestChainHeight);
             final boolean isLesserChainHeight = (! isBetterChainHeight) && (! areEqualChainHeights);
             if (isLesserChainHeight) { continue; }
@@ -58,10 +67,10 @@ public class HashMapNodeSelector implements NodeSelector {
     }
 
     public HashMapNodeSelector(final List<RpcConfiguration> rpcConfigurations) {
-        this(rpcConfigurations, 0L);
+        this(rpcConfigurations, 0);
     }
 
-    public HashMapNodeSelector(final List<RpcConfiguration> rpcConfigurations, final Long maxOrphanDepth) {
+    public HashMapNodeSelector(final List<RpcConfiguration> rpcConfigurations, final Integer maxOrphanDepth) {
         _rpcConfigurations = rpcConfigurations.asConst();
         _maxOrphanDepth = maxOrphanDepth;
     }

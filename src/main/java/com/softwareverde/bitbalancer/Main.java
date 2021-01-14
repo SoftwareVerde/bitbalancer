@@ -106,9 +106,10 @@ public class Main {
             final Integer zmqPort = configuration.getZmqPort(notificationType);
             zmqConfiguration.setPort(notificationType, zmqPort);
         }
-
         final Long blockTemplateCacheDuration = configuration.getBlockTemplateCacheDuration();
-        final Long maxOrphanDepth = configuration.getMaxOrphanDepth();
+        final Integer maxOrphanDepth = configuration.getMaxOrphanDepth();
+
+        Logger.debug("Max Orphan Depth: " + maxOrphanDepth);
 
         _rpcProxyServer = new RpcProxyServer(rpcPort, rpcConfigurations, zmqConfiguration, blockTemplateCacheDuration, maxOrphanDepth);
     }
