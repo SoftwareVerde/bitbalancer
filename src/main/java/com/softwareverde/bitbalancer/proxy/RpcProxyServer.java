@@ -12,7 +12,6 @@ import com.softwareverde.bitcoin.block.header.BlockHeaderInflater;
 import com.softwareverde.bitcoin.rpc.RpcNotification;
 import com.softwareverde.bitcoin.rpc.RpcNotificationCallback;
 import com.softwareverde.bitcoin.rpc.RpcNotificationType;
-import com.softwareverde.bitcoin.util.StringUtil;
 import com.softwareverde.concurrent.service.SleepyService;
 import com.softwareverde.constable.bytearray.ByteArray;
 import com.softwareverde.constable.list.List;
@@ -22,6 +21,7 @@ import com.softwareverde.http.server.endpoint.Endpoint;
 import com.softwareverde.logging.Logger;
 import com.softwareverde.util.CircleBuffer;
 import com.softwareverde.util.HexUtil;
+import com.softwareverde.util.StringUtil;
 import com.softwareverde.util.Util;
 
 import java.util.concurrent.ConcurrentHashMap;

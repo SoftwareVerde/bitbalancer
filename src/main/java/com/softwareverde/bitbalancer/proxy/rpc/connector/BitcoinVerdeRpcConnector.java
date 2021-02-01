@@ -6,12 +6,12 @@ import com.softwareverde.bitcoin.rpc.BitcoinNodeRpcAddress;
 import com.softwareverde.bitcoin.rpc.NodeJsonRpcConnection;
 import com.softwareverde.bitcoin.rpc.RpcCredentials;
 import com.softwareverde.bitcoin.rpc.monitor.Monitor;
-import com.softwareverde.bitcoin.util.StringUtil;
-import com.softwareverde.bitcoin.util.Util;
 import com.softwareverde.http.server.servlet.response.Response;
 import com.softwareverde.json.Json;
 import com.softwareverde.logging.Logger;
 import com.softwareverde.util.Container;
+import com.softwareverde.util.StringUtil;
+import com.softwareverde.util.Util;
 
 public class BitcoinVerdeRpcConnector extends com.softwareverde.bitcoin.rpc.BitcoinVerdeRpcConnector implements BitBalancerRpcConnector {
     public BitcoinVerdeRpcConnector(final BitcoinNodeRpcAddress bitcoinNodeRpcAddress) {

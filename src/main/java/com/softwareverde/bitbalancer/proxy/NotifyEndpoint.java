@@ -3,7 +3,6 @@ package com.softwareverde.bitbalancer.proxy;
 import com.softwareverde.bitbalancer.proxy.rpc.RpcConfiguration;
 import com.softwareverde.bitcoin.rpc.RpcNotification;
 import com.softwareverde.bitcoin.rpc.RpcNotificationType;
-import com.softwareverde.bitcoin.util.Util;
 import com.softwareverde.constable.bytearray.ByteArray;
 import com.softwareverde.constable.bytearray.MutableByteArray;
 import com.softwareverde.constable.list.List;
@@ -14,6 +13,7 @@ import com.softwareverde.http.server.servlet.Servlet;
 import com.softwareverde.http.server.servlet.request.Request;
 import com.softwareverde.http.server.servlet.response.Response;
 import com.softwareverde.logging.Logger;
+import com.softwareverde.util.Util;
 
 public class NotifyEndpoint implements Servlet {
     public interface Context {

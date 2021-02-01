@@ -7,10 +7,10 @@ import com.softwareverde.bitbalancer.proxy.rpc.connector.BitBalancerRpcConnector
 import com.softwareverde.bitcoin.rpc.BlockTemplate;
 import com.softwareverde.bitcoin.rpc.monitor.Monitor;
 import com.softwareverde.bitcoin.server.database.BatchRunner;
-import com.softwareverde.bitcoin.util.Util;
 import com.softwareverde.constable.list.List;
 import com.softwareverde.logging.Logger;
 import com.softwareverde.util.Container;
+import com.softwareverde.util.Util;
 import com.softwareverde.util.timer.NanoTimer;
 
 import java.util.concurrent.ConcurrentHashMap;
