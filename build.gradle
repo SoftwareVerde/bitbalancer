@@ -15,7 +15,7 @@ repositories {
 dependencies {
     // implementation  fileTree(dir: 'libs', include: ['*.jar'])
 
-    implementation (group: 'com.github.softwareverde',  name: 'bitcoin-verde',          version: '449f72cf');
+    implementation (group: 'com.github.softwareverde',  name: 'bitcoin-verde',          version: '6fd0e418');
     implementation  group: 'org.zeromq',                name: 'jeromq',                 version: '0.5.2'
 
     testImplementation 'junit:junit:4.12'
